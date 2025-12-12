@@ -1,31 +1,38 @@
 import fs from "fs-extra";
 import path from "path";
 import { fileURLToPath } from "url";
+import yaml from "js-yaml";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const SNIPPETS_DIR = path.resolve(__dirname, "../packages/snippets");
 const PUBLIC_DIR = path.resolve(__dirname, "../apps/web/public");
-const REGISTRY_FILE = path.join(PUBLIC_DIR, "registry.json");
-const SNIPPETS_PUBLIC_DIR = path.join(PUBLIC_DIR, "snippets");
 
 async function main() {
   console.log("Building registry...");
 
-  await fs.ensureDir(PUBLIC_DIR);
-  await fs.ensureDir(SNIPPETS_PUBLIC_DIR);
+  const REGISTRY_DIR = path.join(PUBLIC_DIR, "registry");
+  await fs.ensureDir(REGISTRY_DIR);
 
-  const registry = [];
+  const frameworks: string[] = [];
 
   // Find all framework folders
-  const frameworks = await fs.readdir(SNIPPETS_DIR);
+  const frameworkDirs = await fs.readdir(SNIPPETS_DIR);
 
-  for (const framework of frameworks) {
-    const frameworkPath = path.join(SNIPPETS_DIR, framework);
+  for (const frameworkName of frameworkDirs) {
+    const frameworkPath = path.join(SNIPPETS_DIR, frameworkName);
     if (!(await fs.stat(frameworkPath)).isDirectory()) continue;
 
-    // Recursive function to find json files
+    frameworks.push(frameworkName);
+    const frameworkRegistry: any[] = [];
+    console.log(`Processing framework: ${frameworkName}`);
+
+    // Recursive function to find snippet files
+    // Use a queue or just simple recursion.
+    // We want to capture 'version' which is likely the immediate subdirectory of frameworkDir.
+    // e.g. express/v5/libs/server.hbs -> version=v5
+
     async function findSnippetConfigs(dir: string) {
       const entries = await fs.readdir(dir);
       for (const entry of entries) {
@@ -34,58 +41,101 @@ async function main() {
 
         if (stat.isDirectory()) {
           await findSnippetConfigs(fullPath);
-        } else if (entry.endsWith(".json")) {
-          // Process snippet config
-          const meta = await fs.readJSON(fullPath);
-          const registryItem = { ...meta, files: [] };
+        } else if (entry.endsWith(".hbs")) {
+          // Identify version from path
+          // Path relative to snippets dir: express/v5/libs/server.hbs
+          const relativePath = path.relative(SNIPPETS_DIR, fullPath);
+          const parts = relativePath.split(path.sep);
+          // parts[0] is framework, parts[1] is version (usually)
+          const version = parts.length > 1 ? parts[1] : "unknown";
 
-          // Construct relative path for source resolution
-          // The JSON file is at fullPath. The sources in it are relative to this JSON file.
+          const content = await fs.readFile(fullPath, "utf-8");
+          const frontmatterMatch = content.match(
+            /^---\n([\s\S]*?)\n---\n([\s\S]*)$/
+          );
+
+          if (!frontmatterMatch) {
+            continue;
+          }
+
+          const metadataRaw = frontmatterMatch[1];
+          const bodyContent = frontmatterMatch[2];
+
+          let meta: any;
+          try {
+            meta = yaml.load(metadataRaw);
+          } catch (e) {
+            console.error(`Error parsing frontmatter in ${fullPath}`, e);
+            continue;
+          }
+
+          if (!meta || !meta.name) {
+            continue;
+          }
+
+          // Injected inferred metadata if missing
+          if (!meta.version) meta.version = version;
+          if (!meta.framework) meta.framework = frameworkName;
+
+          const registryItem = { ...meta, files: [] };
           const configDir = path.dirname(fullPath);
 
-          for (const f of meta.files) {
-            const sourcePath = path.join(configDir, f.source || f.name);
+          if (meta.files && Array.isArray(meta.files)) {
+            for (const f of meta.files) {
+              let fileContent = "";
 
-            try {
-              const content = await fs.readFile(sourcePath, "utf-8");
+              if (f.source) {
+                const sourcePath = path.join(configDir, f.source);
+                try {
+                  let rawSource = await fs.readFile(sourcePath, "utf-8");
+                  const sourceMatch = rawSource.match(
+                    /^---\n([\s\S]*?)\n---\n([\s\S]*)$/
+                  );
+                  if (sourceMatch) {
+                    fileContent = sourceMatch[2];
+                  } else {
+                    fileContent = rawSource;
+                  }
+                } catch (err) {
+                  console.error(
+                    `Error reading source ${f.source} for ${meta.name}`,
+                    err
+                  );
+                  // Skip file or continue? Continue with empty content might break things.
+                  continue;
+                }
+              } else {
+                fileContent = bodyContent;
+              }
 
               registryItem.files.push({
                 name: f.name,
-                content: content,
+                content: fileContent,
               });
-
-              // Copy to public/snippets preserving structure if needed
-              // For now, let's flat map to framework/name ?? Or should we preserve version path?
-              // The user requirement said "maintain version directory for each framework".
-              // Let's stick to framework/name for the registry output path for now as per previous logic,
-              // BUT we might get collisions if we have v4/cors and v5/cors.
-              // Ideally the registry item 'name' should be unique like "express-v5-cors".
-              // Let's assume the JSON 'name' field handles uniqueness.
-
-              const targetPath = path.join(
-                SNIPPETS_PUBLIC_DIR,
-                framework,
-                f.name
-              );
-              await fs.ensureDir(path.dirname(targetPath));
-              await fs.writeFile(targetPath, content);
-            } catch (err) {
-              console.error(
-                `Error reading source file for ${meta.name}: ${sourcePath}`,
-                err
-              );
             }
           }
-          registry.push(registryItem);
+
+          frameworkRegistry.push(registryItem);
         }
       }
     }
 
     await findSnippetConfigs(frameworkPath);
+
+    // Write framework registry
+    await fs.writeJSON(
+      path.join(REGISTRY_DIR, `${frameworkName}.json`),
+      frameworkRegistry,
+      { spaces: 2 }
+    );
   }
 
-  await fs.writeJSON(REGISTRY_FILE, registry, { spaces: 2 });
-  console.log(`Registry built with ${registry.length} items.`);
+  // Write index.json
+  await fs.writeJSON(path.join(REGISTRY_DIR, "index.json"), frameworks, {
+    spaces: 2,
+  });
+
+  console.log(`Registry built. Frameworks: ${frameworks.join(", ")}`);
 }
 
 main().catch(console.error);
