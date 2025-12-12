@@ -11,6 +11,8 @@ export const registryItemSchema = z.object({
       content: z.string(),
     })
   ),
+  framework: z.string().optional(),
+  version: z.string().optional(),
 });
 
 export const registrySchema = z.array(registryItemSchema);
