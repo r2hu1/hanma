@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { Command } from "commander";
-import { init, add } from "./commands";
+import { init, add, help } from "./commands";
 const program = new Command();
 
 program
@@ -10,4 +10,5 @@ program
 
 program.addCommand(init);
 program.addCommand(add);
+program.addCommand(help);
 program.parse();

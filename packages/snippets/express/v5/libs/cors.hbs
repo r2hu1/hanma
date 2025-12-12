@@ -82,7 +82,7 @@ export const validateCorsConfig = () => {
     !allowedHeaders.length
   ) {
     console.warn(
-      "⚠️  CORS configuration might be incomplete. Check CORS_ORIGINS, CORS_METHODS, and CORS_HEADERS .env variables."
+      " CORS configuration might be incomplete. Check CORS_ORIGINS, CORS_METHODS, and CORS_HEADERS .env variables."
     );
     return false;
   }

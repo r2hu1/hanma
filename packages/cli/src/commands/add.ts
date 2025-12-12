@@ -16,7 +16,11 @@ export const add = new Command()
     "[snippet]",
     "The snippet to add (optional, use interactive mode if omitted)"
   )
-  .action(async (snippetName) => {
+  .argument(
+    "[path]",
+    "The destination path (optional, defaults to config.componentsPath)"
+  )
+  .action(async (snippetName, destinationPath) => {
     const config = await getConfig();
     if (!config) {
       console.log(
@@ -24,10 +28,6 @@ export const add = new Command()
       );
       process.exit(1);
     }
-
-    let selectedFramework = "";
-    let selectedVersion = "";
-    let selectedSnippet: RegistryItem | undefined;
 
     // 1. Select Framework
     const frameworksSpinner = ora("Fetching frameworks...").start();
@@ -40,6 +40,10 @@ export const add = new Command()
       console.error(error);
       process.exit(1);
     }
+
+    let selectedFramework = "";
+    let selectedVersion = "";
+    let selectedSnippet: RegistryItem | undefined;
 
     const { framework } = await prompts({
       type: "autocomplete",
@@ -146,23 +150,21 @@ export const add = new Command()
       await installDependencies(item.devDependencies, true);
       devInstallSpinner.succeed("Dev dependencies installed");
     }
-
     // Write files
     const writeSpinner = ora("Writing files...").start();
     for (const file of item.files) {
-      // We might want to respect the 'componentsPath' but maybe namespace by framework/version?
-      // User didn't specify. Standard is config.componentsPath + file.name.
-      // E.g. default components/server.ts
-
       const targetPath = path.join(
         process.cwd(),
-        config.componentsPath,
+        destinationPath || config.componentsPath, // Modified line
         file.name
       );
       await fs.ensureDir(path.dirname(targetPath));
       await fs.writeFile(targetPath, file.content);
     }
-    writeSpinner.succeed(`Files written to ${config.componentsPath}`);
+    writeSpinner.succeed(
+      `Files written to ${destinationPath || config.componentsPath}`
+    );
+    // ...
 
     console.log(chalk.green(`\n✔ Successfully added ${item.name}!`));
   });
