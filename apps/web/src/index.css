@@ -1,15 +1,56 @@
 @import "tailwindcss";
 
+@theme {
+  --font-sans: 'Inter', sans-serif;
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-hover: var(--surface-hover);
+  --color-border: var(--border);
+  --color-primary: #f5d0fe;
+  --color-secondary: #ffedd5;
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+}
+
 @layer base {
-  body {
-    @apply bg-neutral-950 text-neutral-100 font-sans antialiased;
+  :root {
+    --background: #ffffff;
+    --surface: #fafafa;
+    --surface-hover: #f4f4f5;
+    --border: #e4e4e7;
+    --foreground: #09090b;
+    --muted: #71717a;
   }
-  ::selection {
-    @apply bg-orange-500/30 text-orange-100;
+
+  .dark {
+    --background: #09090b;
+    --surface: #121214;
+    --surface-hover: #1c1c1f;
+    --border: #27272a;
+    --foreground: #ffffff;
+    --muted: #a1a1aa;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased transition-colors duration-300;
   }
 }
 
 @layer utilities {
+  .bg-grid {
+    background-size: 50px 50px;
+    background-image: linear-gradient(to right, var(--border) 1px, transparent 1px),
+                      linear-gradient(to bottom, var(--border) 1px, transparent 1px);
+    mask-image: linear-gradient(to bottom, transparent, black, transparent);
+    -webkit-mask-image: linear-gradient(to bottom, transparent 5%, black 40%, black 70%, transparent 95%);
+  }
+  
+  .bg-grid-small {
+    background-size: 20px 20px;
+    background-image: linear-gradient(to right, var(--border) 1px, transparent 1px),
+                      linear-gradient(to bottom, var(--border) 1px, transparent 1px);
+  }
+
   .custom-scrollbar::-webkit-scrollbar {
     width: 6px;
     height: 6px;
@@ -21,3 +62,6 @@
     @apply bg-neutral-800 rounded-full hover:bg-neutral-700 transition-colors;
   }
 }
+
+/* Import Font */
+/* @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap'); */

@@ -1,49 +1,109 @@
+import { LuSearch, LuGithub, LuCopy, LuCheck } from 'react-icons/lu';
 
-import { FaGithub } from 'react-icons/fa6';
-import { LuTerminal } from 'react-icons/lu';
-
-export function Hero() {
+const Hero = () => {
   return (
-    <div className="flex flex-col items-center justify-center text-center py-20 min-h-[80vh] relative overflow-hidden container mx-auto px-4">
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full -z-10 bg-[radial-gradient(circle_at_center,rgba(234,88,12,0.15)_0%,rgba(10,10,10,0)_70%)]"></div>
-      
-      <h1 className="text-6xl tracking-tight mb-6 font-bold bg-gradient-to-br from-white to-neutral-400 bg-clip-text text-transparent">
-        Build High-Performance<br />Backends Faster
-      </h1>
-      <p className="text-xl text-neutral-400 max-w-2xl mb-12">
-        A powerful CLI to scaffold production-ready code snippets for Express, Hono, and more. 
-        Focus on logic, not boilerplate.
-      </p>
-      
-      <div className="flex gap-4 mb-20">
-        <a href="#snippets" className="px-6 py-3 bg-neutral-100 text-neutral-950 rounded-lg font-semibold hover:bg-white hover:-translate-y-px transition-all flex items-center gap-2">
-          <LuTerminal />
-          Browse Snippets
-        </a>
-        <a href="https://github.com/itstheanurag/hanma" target="_blank" rel="noreferrer" className="px-6 py-3 bg-neutral-900 text-neutral-100 rounded-lg font-medium border border-neutral-800 hover:bg-neutral-800 hover:border-neutral-700 transition-all flex items-center gap-2">
-          <FaGithub />
-          GitHub
-        </a>
-      </div>
+    <section className="pt-32 pb-20 px-6 relative overflow-hidden">
+      {/* Grid accents */}
+      <div className="absolute top-0 right-0 p-32 bg-secondary/10 blur-3xl rounded-full translate-x-1/2 -translate-y-1/2 pointer-events-none"></div>
 
-      {/* Terminal Window */}
-      <div className="w-full max-w-2xl bg-black border border-neutral-800 rounded-xl overflow-hidden shadow-2xl shadow-neutral-950/50">
-        <div className="flex items-center px-4 py-3 bg-neutral-900/50 border-b border-neutral-800">
-          <div className="flex gap-1.5">
-            <span className="w-3 h-3 rounded-full bg-red-500"></span>
-            <span className="w-3 h-3 rounded-full bg-yellow-500"></span>
-            <span className="w-3 h-3 rounded-full bg-green-500"></span>
+      <div className="grid lg:grid-cols-12 gap-0 lg:divide-x divide-border border-b border-border -mx-6 px-6 pb-12">
+        {/* Left Content */}
+        <div className="lg:col-span-7 space-y-8 pr-0 lg:pr-12">
+          <div>
+             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-surface border border-border text-xs font-medium text-foreground mb-6">
+                <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+                v1.0 Public Beta
+             </div>
+            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight text-foreground leading-[1.1]">
+              Backend Components.<br />
+              <span className="text-muted">Copy. Paste. Ship.</span>
+            </h1>
+            <p className="mt-6 text-lg text-muted max-w-xl leading-relaxed">
+              Beautifully designed, secure, and production-ready backend snippets. 
+              Not a framework. Just code you can copy into your Express, Hono, or Elysia apps.
+            </p>
           </div>
-          <div className="flex-1 text-center font-sans text-sm text-neutral-500">bash</div>
+
+          {/* Search Interface */}
+          <div className="w-full max-w-xl">
+             <div className="relative group">
+                <div className="absolute -inset-0.5 bg-gradient-to-r from-secondary/50 to-purple-500/50 rounded-xl blur opacity-20 group-hover:opacity-40 transition duration-500"></div>
+                <div className="relative bg-surface border border-border rounded-xl p-2 flex items-center gap-2 shadow-sm">
+                    <LuSearch className="text-muted ml-3" size={20} />
+                    <input 
+                        type="text" 
+                        placeholder="Search for components..." 
+                        className="w-full bg-transparent text-foreground placeholder-muted outline-none py-2"
+                    />
+                    <div className="hidden md:flex gap-1 text-[10px] font-mono text-muted border border-border px-2 py-1 rounded bg-background">
+                        <span className="text-xs">⌘</span>K
+                    </div>
+                </div>
+             </div>
+             <div className="flex gap-4 mt-4 text-xs text-muted font-mono">
+                <span className="font-semibold text-foreground">Popular:</span>
+                <span className="hover:text-foreground cursor-pointer underline decoration-border underline-offset-4">Auth</span>
+                <span className="hover:text-foreground cursor-pointer underline decoration-border underline-offset-4">RateLimit</span>
+                <span className="hover:text-foreground cursor-pointer underline decoration-border underline-offset-4">Webhooks</span>
+             </div>
+          </div>
+
+          <div className="flex flex-wrap gap-4 pt-4">
+            <button className="flex items-center gap-2 bg-foreground text-background px-6 py-3 rounded-lg font-medium hover:opacity-90 transition-opacity">
+              Browse Components
+            </button>
+            <button className="flex items-center gap-2 bg-surface text-foreground px-6 py-3 rounded-lg font-medium hover:bg-surface-hover transition-colors border border-border">
+              <LuGithub size={18} />
+              <span>Star on GitHub</span>
+            </button>
+          </div>
         </div>
-        <div className="p-8 text-left font-mono text-base">
-          <div className="flex items-center gap-2 text-neutral-100">
-            <span className="text-orange-500">➜</span>
-            <span>npx hanma add</span>
-            <span className="inline-block w-2 h-5 bg-neutral-500 animate-pulse"></span>
-          </div>
+
+        {/* Right Content - Visual Code/Grid */}
+        <div className="lg:col-span-5 hidden lg:block pl-12 pt-8 lg:pt-0">
+           <div className="border border-border bg-surface rounded-xl overflow-hidden shadow-2xl">
+              <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-background/50">
+                 <div className="flex gap-1.5">
+                    <div className="w-3 h-3 rounded-full bg-red-500/20 border border-red-500/50"></div>
+                    <div className="w-3 h-3 rounded-full bg-yellow-500/20 border border-yellow-500/50"></div>
+                    <div className="w-3 h-3 rounded-full bg-green-500/20 border border-green-500/50"></div>
+                 </div>
+                 <div className="text-xs text-muted font-mono">rate_limit.ts</div>
+                 <LuCopy size={14} className="text-muted hover:text-foreground cursor-pointer" />
+              </div>
+              <div className="p-4 overflow-x-auto bg-[#0c0c0e]">
+                 <pre className="text-xs md:text-sm font-mono leading-relaxed text-zinc-300">
+                    <span className="text-purple-400">import</span> {"{ RateLimiter }"} <span className="text-purple-400">from</span> <span className="text-green-400">'@hanma/core'</span>;<br/><br/>
+                    <span className="text-purple-400">export const</span> limiter = <span className="text-blue-400">new</span> RateLimiter({"{ "}<br/>
+                    {"  "}window: <span className="text-orange-400">"1m"</span>,<br/>
+                    {"  "}limit: <span className="text-orange-400">100</span>,<br/>
+                    {"  "}storage: <span className="text-orange-400">"redis"</span><br/>
+                    {"}"});
+                 </pre>
+              </div>
+              <div className="border-t border-border bg-background/50 p-4 flex justify-between items-center">
+                 <div className="text-xs text-muted">TypeScript • 1.2kb</div>
+                 <div className="flex items-center gap-1 text-green-600 dark:text-green-400 text-xs bg-green-500/10 px-2 py-1 rounded">
+                    <LuCheck size={12} /> Production Ready
+                 </div>
+              </div>
+           </div>
+
+           {/* Stats Grid Mini */}
+           <div className="grid grid-cols-2 gap-px bg-border border border-border mt-8 rounded-lg overflow-hidden">
+               <div className="bg-surface p-4 flex flex-col items-center justify-center text-center">
+                  <div className="text-2xl font-bold text-foreground">200+</div>
+                  <div className="text-[10px] uppercase tracking-wider text-muted font-semibold mt-1">Components</div>
+               </div>
+               <div className="bg-surface p-4 flex flex-col items-center justify-center text-center">
+                  <div className="text-2xl font-bold text-foreground">Open</div>
+                  <div className="text-[10px] uppercase tracking-wider text-muted font-semibold mt-1">Source</div>
+               </div>
+           </div>
         </div>
       </div>
-    </div>
+    </section>
   );
-}
+};
+
+export default Hero;

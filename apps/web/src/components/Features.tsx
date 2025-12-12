@@ -1,65 +1,82 @@
-import { LuRocket, LuShield, LuZap, LuSettings, LuPackage, LuTerminal } from 'react-icons/lu';
+import { LuZap, LuLayers, LuGitBranch, LuCode, LuShieldCheck, LuDatabase } from 'react-icons/lu';
 
-export function Features() {
-  const features = [
-    {
-      title: "Production Ready",
-      description: "Snippets include best practices like graceful shutdown, security headers, and structured logging.",
-      icon: <LuRocket />
-    },
-    {
-      title: "Type-Safe",
-      description: "Built with TypeScript in mind. All snippets come with full type definition and interfaces.",
-      icon: <LuShield />
-    },
-    {
-      title: "Framework Agnostic",
-      description: "Supports Express, Hono, NestJS, and more. Consistent patterns across all frameworks.",
-      icon: <LuZap />
-    },
-    {
-      title: "Customizable",
-      description: "Pure code tailored to your needs. No hidden abstractions or vendor lock-in.",
-      icon: <LuSettings />
-    },
-    {
-      title: "Zero Runtime Ops",
-      description: "Add the code to your project and you own it. No external dependencies or services.",
-      icon: <LuPackage />
-    },
-    {
-      title: "Developer First",
-      description: "CLI tool designed for speed. Interactive mode or quick flags to get what you need.",
-      icon: <LuTerminal />
-    }
-  ];
+const features = [
+  {
+    icon: <LuShieldCheck className="text-foreground" />,
+    title: "Security First",
+    description: "Every snippet is audited for common vulnerabilities (OWASP Top 10) before being published."
+  },
+  {
+    icon: <LuZap className="text-foreground" />,
+    title: "Zero Dependencies",
+    description: "Code that relies on standard libraries whenever possible to keep your bundle size small."
+  },
+  {
+    icon: <LuCode className="text-foreground" />,
+    title: "Type Safe",
+    description: "Written in TypeScript, Go, and Python with full type definitions included out of the box."
+  },
+  {
+    icon: <LuDatabase className="text-foreground" />,
+    title: "Database Agnostic",
+    description: "Adapters for PostgreSQL, MySQL, and MongoDB. Switch databases without rewriting logic."
+  },
+  {
+     icon: <LuLayers className="text-foreground" />,
+     title: "Modular Design",
+     description: "Composable functions that can be used independently or chained together."
+  },
+  {
+     icon: <LuGitBranch className="text-foreground" />,
+     title: "Version Controlled",
+     description: "Track changes to components in your own git history. No black-box npm updates."
+  }
+];
 
+const Features = () => {
   return (
-    <div className="container mx-auto px-4 py-24">
-      <div className="text-center mb-16">
-        <h2 className="text-3xl md:text-4xl font-bold mb-4 bg-gradient-to-br from-white to-neutral-400 bg-clip-text text-transparent">
-          Why Hanma?
-        </h2>
-        <p className="text-neutral-400 max-w-2xl mx-auto">
-          We provide the building blocks for modern backends, so you can focus on your unique business rules.
-        </p>
+    <section className="py-24 px-6 bg-surface">
+      <div className="mb-16 max-w-2xl">
+          <h2 className="text-2xl md:text-3xl font-bold text-foreground mb-4">Everything you need</h2>
+          <p className="text-muted">
+            Built with modern architecture patterns to ensure scalability and maintainability from day one.
+          </p>
       </div>
-      
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {features.map((feature) => (
-          <div key={feature.title} className="p-8 bg-neutral-900/20 border border-neutral-800 rounded-2xl hover:bg-neutral-900/40 hover:border-neutral-700 transition-all group">
-            <div className="text-4xl mb-6 bg-neutral-800 w-16 h-16 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+
+      <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-px bg-border border border-border rounded-2xl overflow-hidden">
+        {features.map((feature, idx) => (
+          <div key={idx} className="bg-background p-8 hover:bg-surface-hover transition-colors group relative">
+            <div className="absolute top-0 right-0 p-4 opacity-0 group-hover:opacity-100 transition-opacity">
+               <ArrowUpRightIcon className="text-muted w-4 h-4" />
+            </div>
+            <div className="w-10 h-10 bg-surface border border-border rounded-lg flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
               {feature.icon}
             </div>
-            <h3 className="text-xl font-semibold mb-3 text-neutral-200">
-              {feature.title}
-            </h3>
-            <p className="text-neutral-400 leading-relaxed">
-              {feature.description}
-            </p>
+            <h3 className="text-lg font-semibold text-foreground mb-3">{feature.title}</h3>
+            <p className="text-sm text-muted leading-relaxed">{feature.description}</p>
           </div>
         ))}
       </div>
-    </div>
+    </section>
   );
-}
+};
+
+const ArrowUpRightIcon = ({ className }: { className?: string }) => (
+    <svg 
+        xmlns="http://www.w3.org/2000/svg" 
+        width="24" 
+        height="24" 
+        viewBox="0 0 24 24" 
+        fill="none" 
+        stroke="currentColor" 
+        strokeWidth="2" 
+        strokeLinecap="round" 
+        strokeLinejoin="round" 
+        className={className}
+    >
+        <path d="M7 7h10v10" />
+        <path d="M7 17 17 7" />
+    </svg>
+);
+
+export default Features;
