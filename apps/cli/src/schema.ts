@@ -3,11 +3,14 @@ import { z } from "zod";
 export const registryItemSchema = z.object({
   name: z.string(),
   description: z.string(),
+  type: z.enum(["snippet", "module"]).default("snippet"),
+  category: z.string().optional(), // e.g., "libs", "middleware", "utils"
   dependencies: z.array(z.string()).optional(),
   devDependencies: z.array(z.string()).optional(),
   files: z.array(
     z.object({
       name: z.string(),
+      path: z.string().optional(), // For modules: relative path within the module
       content: z.string(),
     })
   ),

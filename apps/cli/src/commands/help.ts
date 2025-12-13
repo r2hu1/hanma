@@ -12,6 +12,7 @@ export const help = new Command()
       ${chalk.cyan("hanma")} [command] [options]
 
       ${chalk.bold("COMMANDS")}
+        ${chalk.yellow("create")}  Creates a backend project depending on your preferences.  
       ${chalk.yellow("add")}       Interactive mode to browse and add snippets.
       ${chalk.yellow("init")}      Initialize Hanma in your project.
       ${chalk.yellow("help")}      Display this help message.
@@ -26,4 +27,4 @@ export const help = new Command()
       ${chalk.bold("DOCUMENTATION")}
       https://github.com/itstheanurag/hanma
     `);
- });
+  });

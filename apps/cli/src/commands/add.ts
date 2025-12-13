@@ -98,22 +98,72 @@ export const add = new Command()
       selectedVersion = "latest"; // Default/Unknown
     }
 
-    // 4. Select Snippet
-    // Filter registry by version if we selected one (and if items have version)
-    // If selectedVersion is "latest" (no version found), show all?
-    // If items correspond to versions, filter.
-
-    const filteredSnippets = registry.filter((item) => {
-      if (!selectedVersion || selectedVersion === "latest") return true;
-      return item.version === selectedVersion;
+    // 4. Select Type (snippet or module)
+    const { selectedType } = await prompts({
+      type: "select",
+      name: "selectedType",
+      message: "What do you want to add?",
+      choices: [
+        { title: "Snippet (single file)", value: "snippet" },
+        { title: "Module (multi-file)", value: "module" },
+        { title: "All", value: "all" },
+      ],
     });
 
+    if (!selectedType) {
+      console.log("Operation cancelled.");
+      process.exit(0);
+    }
+
+    // 5. Filter by version and type
+    const filteredByVersionAndType = registry.filter((item) => {
+      const versionMatch =
+        !selectedVersion ||
+        selectedVersion === "latest" ||
+        item.version === selectedVersion;
+      const typeMatch = selectedType === "all" || item.type === selectedType;
+      return versionMatch && typeMatch;
+    });
+
+    // Group by category for better UX
+    const categories = Array.from(
+      new Set(
+        filteredByVersionAndType.map((item) => item.category || "uncategorized")
+      )
+    ).sort();
+
+    // 6. Select Category (optional grouping)
+    let filteredSnippets = filteredByVersionAndType;
+    if (categories.length > 1) {
+      const { category } = await prompts({
+        type: "select",
+        name: "category",
+        message: "Select a category",
+        choices: [
+          { title: "All categories", value: "all" },
+          ...categories.map((c) => ({ title: c, value: c })),
+        ],
+      });
+
+      if (!category) {
+        console.log("Operation cancelled.");
+        process.exit(0);
+      }
+
+      if (category !== "all") {
+        filteredSnippets = filteredByVersionAndType.filter(
+          (item) => (item.category || "uncategorized") === category
+        );
+      }
+    }
+
+    // 7. Select Snippet
     const { snippet } = await prompts({
       type: "autocomplete",
       name: "snippet",
       message: "Select a snippet to add",
       choices: filteredSnippets.map((item) => ({
-        title: item.name,
+        title: `${item.type === "module" ? "MODULE" : "SNIPPET"} ${item.name}`,
         value: item,
         description: item.description,
       })),
@@ -166,5 +216,5 @@ export const add = new Command()
     );
     // ...
 
-    console.log(chalk.green(`\n✔ Successfully added ${item.name}!`));
+    console.log(chalk.green(`\nSuccessfully added ${item.name}!`));
   });

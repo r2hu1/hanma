@@ -34,7 +34,7 @@ export const init = new Command()
       utilsPath: response.utilsPath,
     });
 
-    console.log(chalk.green(`\n✔ Configuration saved to hanma.json`));
+    console.log(chalk.green(`\nConfiguration saved to hanma.json`));
     console.log(
       "You can now add snippets using " + chalk.cyan("hanma add <snippet>")
     );
