@@ -6,29 +6,29 @@
   --color-surface: var(--surface);
   --color-surface-hover: var(--surface-hover);
   --color-border: var(--border);
-  --color-primary: #f5d0fe;
-  --color-secondary: #ffedd5;
+  --color-primary: oklch(0.88 0.1 320);
+  --color-secondary: oklch(0.95 0.05 60);
   --color-foreground: var(--foreground);
   --color-muted: var(--muted);
 }
 
 @layer base {
   :root {
-    --background: #ffffff;
-    --surface: #fafafa;
-    --surface-hover: #f4f4f5;
-    --border: #e4e4e7;
-    --foreground: #09090b;
-    --muted: #71717a;
+    --background: oklch(1 0 0);
+    --surface: oklch(0.985 0 0);
+    --surface-hover: oklch(0.97 0 0);
+    --border: oklch(0.92 0 0);
+    --foreground: oklch(0.145 0.02 285);
+    --muted: oklch(0.55 0.03 260);
   }
 
   .dark {
-    --background: #09090b;
-    --surface: #121214;
-    --surface-hover: #1c1c1f;
-    --border: #27272a;
-    --foreground: #ffffff;
-    --muted: #a1a1aa;
+    --background: oklch(0.145 0.02 285);
+    --surface: oklch(0.17 0.02 285);
+    --surface-hover: oklch(0.2 0.02 285);
+    --border: oklch(0.26 0.02 285);
+    --foreground: oklch(0.985 0 0);
+    --muted: oklch(0.7 0.02 260);
   }
 
   body {
@@ -62,44 +62,3 @@
     @apply bg-neutral-800 rounded-full hover:bg-neutral-700 transition-colors;
   }
 }
-
-/* Global Smooth Theme Transition */
-*,
-::before,
-::after {
-  transition-property: background-color, border-color, color, fill, stroke;
-  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-  transition-duration: 300ms;
-}
-
-@keyframes draw {
-  from {
-    stroke-dashoffset: 1000;
-  }
-  to {
-    stroke-dashoffset: 0;
-  }
-}
-
-@keyframes fade-in {
-  from {
-    fill-opacity: 0;
-  }
-  to {
-    fill-opacity: 1;
-  }
-}
-
-.animate-logo-path {
-  stroke-dasharray: 1000;
-  stroke-dashoffset: 1000;
-  animation: draw 2s ease-out forwards;
-}
-
-.animate-logo-fill {
-  fill-opacity: 0;
-  animation: fade-in 1s ease-out 1.5s forwards;
-}
-
-/* Import Font */
-/* @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap'); */
