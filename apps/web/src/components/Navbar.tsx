@@ -1,4 +1,5 @@
-import { LuGithub, LuMoon, LuSun, LuCommand } from 'react-icons/lu';
+import { LuGithub, LuMoon, LuSun } from 'react-icons/lu';
+import Logo from './Logo';
 import { useTheme } from './ThemeContext';
 import { Link } from 'react-router-dom';
 
@@ -9,9 +10,7 @@ const Navbar = () => {
     <nav className="fixed top-0 left-0 right-0 z-50 border-b border-border bg-background/80 backdrop-blur-md">
       <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
         <Link to="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
-          <div className="w-8 h-8 bg-foreground text-background flex items-center justify-center rounded-lg">
-            <LuCommand size={18} strokeWidth={3} />
-          </div>
+          <Logo className="text-foreground" size={32} />
           <span className="text-xl font-bold tracking-tight text-foreground">Hanma</span>
         </Link>
 

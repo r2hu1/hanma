@@ -10,7 +10,8 @@
     "build": "tsup",
     "dev": "tsup --watch",
     "start": "node dist/index.js",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "check-types": "tsc --noEmit"
   },
   "keywords": [],
   "author": "Gaurav Kumar",
@@ -29,13 +30,14 @@
     "zod": "^3.22.4"
   },
   "devDependencies": {
+    "@repo/eslint-config": "workspace:^",
     "@repo/typescript-config": "workspace:*",
     "@types/fs-extra": "^11.0.4",
     "@types/node": "^20.10.0",
     "@types/prompts": "^2.4.9",
-    "eslint": "^8.56.0",
+    "eslint": "^9.39.1",
     "tsup": "^8.0.1",
     "tsx": "^4.21.0",
-    "typescript": "^5.3.3"
+    "typescript": "^5.9.3"
   }
 }

@@ -1,5 +1,6 @@
-import { LuCommand, LuGithub, LuTwitter, LuDisc } from 'react-icons/lu';
+import { LuGithub, LuTwitter, LuDisc } from 'react-icons/lu';
 import { Link } from 'react-router-dom';
+import Logo from './Logo';
 
 const Footer = () => {
   return (
@@ -8,9 +9,7 @@ const Footer = () => {
         <div className="grid md:grid-cols-4 gap-12 mb-12">
           <div className="col-span-2">
              <Link to="/" className="flex items-center gap-2 mb-4 hover:opacity-80 transition-opacity">
-                <div className="w-6 h-6 bg-foreground text-background flex items-center justify-center rounded-md">
-                    <LuCommand size={14} strokeWidth={3} />
-                </div>
+                <Logo className="text-foreground" size={24} />
                 <span className="text-lg font-bold text-foreground">Hanma</span>
             </Link>
             <p className="text-muted text-sm max-w-sm">
