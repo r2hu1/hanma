@@ -52,16 +52,16 @@ export const createCorsOptions = (
 
   return {
     origin: (
-      origin: string,
-      callback: (error: Error | null, result: boolean) => void
+      origin: string | undefined,
+      callback: (error: Error | null, allow?: boolean) => void
     ) => {
-      // Allow requests with no origin (like mobile apps or curl requests)
+      // Allow requests with no origin (mobile apps, curl, same-origin)
       if (!origin) return callback(null, true);
 
       if (origins.length === 0 || origins.includes(origin)) {
         callback(null, true);
       } else {
-        callback(new Error("Not allowed by CORS"), false);
+        callback(new Error("Not allowed by CORS"));
       }
     },
     methods,
