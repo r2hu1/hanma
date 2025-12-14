@@ -3,7 +3,10 @@ import { motion, useSpring, useTransform } from "motion/react";
 
 function Counter({ value }: { value: number }) {
   const spring = useSpring(0, { mass: 0.8, stiffness: 75, damping: 15 });
-  const display = useTransform(spring, (current) => Math.round(current).toLocaleString() + "+");
+  const display = useTransform(
+    spring,
+    (current) => Math.round(current).toLocaleString() + "+",
+  );
 
   useEffect(() => {
     spring.set(value);
@@ -15,7 +18,7 @@ function Counter({ value }: { value: number }) {
 export function Stats() {
   const [stars, setStars] = useState(100);
   const [contributors, setContributors] = useState(5);
-  
+
   useEffect(() => {
     // Fetch GitHub Stars
     fetch("https://api.github.com/repos/itstheanurag/hanma")
@@ -26,9 +29,13 @@ export function Stats() {
       .catch((err) => console.error("Failed to fetch stars", err));
 
     // Fetch Contributors (simple count of first page for now)
-    fetch("https://api.github.com/repos/itstheanurag/hanma/contributors?per_page=1&anon=true")
+    fetch(
+      "https://api.github.com/repos/itstheanurag/hanma/contributors?per_page=1&anon=true",
+    )
       .then((_) => {
-        return fetch("https://api.github.com/repos/itstheanurag/hanma/contributors?per_page=100&anon=true");
+        return fetch(
+          "https://api.github.com/repos/itstheanurag/hanma/contributors?per_page=100&anon=true",
+        );
       })
       .then((res) => res.json())
       .then((data) => {

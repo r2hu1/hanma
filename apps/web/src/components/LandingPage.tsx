@@ -1,14 +1,17 @@
-import Hero from './Hero';
-import Features from './Features';
-import SupportedFrameworks from './SupportedFrameworks';
-import TerminalSection from './TerminalSection';
-import FAQ from './FAQ';
-import Community from './Community';
+import Hero from "./Hero";
+import Philosophy from "./Philosophy";
+import Features from "./Features";
+import SupportedFrameworks from "./SupportedFrameworks";
+import TerminalSection from "./TerminalSection";
+import FAQ from "./FAQ";
+import Community from "./Community";
 
 const LandingPage = () => {
   return (
     <>
       <Hero />
+      <div className="w-full h-px bg-border" />
+      <Philosophy />
       <div className="w-full h-px bg-border" />
       <TerminalSection />
       <div className="w-full h-px bg-border" />

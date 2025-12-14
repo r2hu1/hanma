@@ -12,7 +12,7 @@ export const registryItemSchema = z.object({
       name: z.string(),
       path: z.string().optional(), // For modules: relative path within the module
       content: z.string(),
-    })
+    }),
   ),
   framework: z.string().optional(),
   version: z.string().optional(),
