@@ -1,5 +1,5 @@
 import { Command } from "commander";
-import { getConfig } from "../utils/config";
+import { getConfig, HanmaConfig } from "../utils/config";
 import { fetchFrameworks, fetchRegistry } from "../utils/registry";
 import { installDependencies } from "../utils/install";
 import path from "path";
@@ -8,6 +8,197 @@ import chalk from "chalk";
 import ora from "ora";
 import prompts from "prompts";
 import { RegistryItem } from "../schema";
+
+// ============================================================================
+// User Prompts
+// ============================================================================
+
+/**
+ * Prompt for framework selection
+ */
+async function promptFramework(frameworks: string[]): Promise<string | null> {
+  const { framework } = await prompts({
+    type: "autocomplete",
+    name: "framework",
+    message: "Select a framework",
+    choices: frameworks.map((f) => ({ title: f, value: f })),
+  });
+
+  return framework || null;
+}
+
+/**
+ * Prompt for version selection or default to latest
+ */
+async function promptVersion(registry: RegistryItem[]): Promise<string> {
+  const versions = Array.from(
+    new Set(
+      registry.map((item) => item.version).filter((v): v is string => !!v)
+    )
+  );
+
+  if (versions.length > 1) {
+    const { version } = await prompts({
+      type: "select",
+      name: "version",
+      message: "Select a version",
+      choices: versions.map((v) => ({ title: v, value: v })),
+    });
+    if (!version) {
+      return ""; // Will be handled as cancelled
+    }
+    return version;
+  }
+
+  if (versions.length === 1) {
+    return versions[0]!;
+  }
+
+  return "latest";
+}
+
+/**
+ * Prompt for snippet type selection (snippet, module, or all)
+ */
+async function promptSnippetType(): Promise<
+  "snippet" | "module" | "all" | null
+> {
+  const { selectedType } = await prompts({
+    type: "select",
+    name: "selectedType",
+    message: "What do you want to add?",
+    choices: [
+      { title: "Snippet (single file)", value: "snippet" },
+      { title: "Module (multi-file)", value: "module" },
+      { title: "All", value: "all" },
+    ],
+  });
+
+  return selectedType || null;
+}
+
+/**
+ * Filter registry items by version and type
+ */
+function filterByVersionAndType(
+  registry: RegistryItem[],
+  version: string,
+  type: "snippet" | "module" | "all"
+): RegistryItem[] {
+  return registry.filter((item) => {
+    const versionMatch =
+      !version || version === "latest" || item.version === version;
+    const typeMatch = type === "all" || item.type === type;
+    return versionMatch && typeMatch;
+  });
+}
+
+/**
+ * Prompt for category selection and filter items
+ */
+async function promptCategory(
+  items: RegistryItem[]
+): Promise<RegistryItem[] | null> {
+  const categories = Array.from(
+    new Set(items.map((item) => item.category || "uncategorized"))
+  ).sort();
+
+  if (categories.length <= 1) {
+    return items;
+  }
+
+  const { category } = await prompts({
+    type: "select",
+    name: "category",
+    message: "Select a category",
+    choices: [
+      { title: "All categories", value: "all" },
+      ...categories.map((c) => ({ title: c, value: c })),
+    ],
+  });
+
+  if (!category) {
+    return null;
+  }
+
+  if (category === "all") {
+    return items;
+  }
+
+  return items.filter(
+    (item) => (item.category || "uncategorized") === category
+  );
+}
+
+/**
+ * Prompt for snippet selection from filtered list
+ */
+async function promptSnippet(
+  items: RegistryItem[]
+): Promise<RegistryItem | null> {
+  const { snippet } = await prompts({
+    type: "autocomplete",
+    name: "snippet",
+    message: "Select a snippet to add",
+    choices: items.map((item) => ({
+      title: `${item.type === "module" ? "MODULE" : "SNIPPET"} ${item.name}`,
+      value: item,
+      description: item.description,
+    })),
+  });
+
+  return snippet || null;
+}
+
+// ============================================================================
+// Installation
+// ============================================================================
+
+/**
+ * Install a snippet's dependencies and write its files
+ */
+async function installSnippet(
+  item: RegistryItem,
+  destinationPath: string | undefined,
+  config: HanmaConfig
+): Promise<void> {
+  console.log(chalk.blue(`\nInstalling ${item.name}...`));
+
+  // Install dependencies
+  if (item.dependencies?.length) {
+    const installSpinner = ora(
+      `Installing dependencies: ${item.dependencies.join(", ")}...`
+    ).start();
+    await installDependencies(item.dependencies);
+    installSpinner.succeed("Dependencies installed");
+  }
+
+  // Install dev dependencies
+  if (item.devDependencies?.length) {
+    const devInstallSpinner = ora(
+      `Installing devDependencies: ${item.devDependencies.join(", ")}...`
+    ).start();
+    await installDependencies(item.devDependencies, true);
+    devInstallSpinner.succeed("Dev dependencies installed");
+  }
+
+  // Write files
+  const targetDir = destinationPath || config.componentsPath;
+  const writeSpinner = ora("Writing files...").start();
+
+  for (const file of item.files) {
+    const targetPath = path.join(process.cwd(), targetDir, file.name);
+    await fs.ensureDir(path.dirname(targetPath));
+    await fs.writeFile(targetPath, file.content);
+  }
+
+  writeSpinner.succeed(`Files written to ${targetDir}`);
+  console.log(chalk.green(`\nSuccessfully added ${item.name}!`));
+}
+
+// ============================================================================
+// Main Command
+// ============================================================================
 
 export const add = new Command()
   .name("add")
@@ -21,6 +212,7 @@ export const add = new Command()
     "The destination path (optional, defaults to config.componentsPath)"
   )
   .action(async (snippetName, destinationPath) => {
+    // 1. Get config
     const config = await getConfig();
     if (!config) {
       console.log(
@@ -29,7 +221,7 @@ export const add = new Command()
       process.exit(1);
     }
 
-    // 1. Select Framework
+    // 2. Fetch and select framework
     const frameworksSpinner = ora("Fetching frameworks...").start();
     let frameworks: string[] = [];
     try {
@@ -41,24 +233,13 @@ export const add = new Command()
       process.exit(1);
     }
 
-    let selectedFramework = "";
-    let selectedVersion = "";
-    let selectedSnippet: RegistryItem | undefined;
-
-    const { framework } = await prompts({
-      type: "autocomplete",
-      name: "framework",
-      message: "Select a framework",
-      choices: frameworks.map((f) => ({ title: f, value: f })),
-    });
-
-    if (!framework) {
+    const selectedFramework = await promptFramework(frameworks);
+    if (!selectedFramework) {
       console.log("Operation cancelled.");
       process.exit(0);
     }
-    selectedFramework = framework;
 
-    // 2. Fetch Registry for Framework
+    // 3. Fetch registry
     const registrySpinner = ora(
       `Fetching registry for ${selectedFramework}...`
     ).start();
@@ -72,149 +253,41 @@ export const add = new Command()
       process.exit(1);
     }
 
-    // 3. Select Version (if applicable)
-    // Extract unique versions
-    const versions = Array.from(
-      new Set(
-        registry.map((item) => item.version).filter((v): v is string => !!v)
-      )
-    );
-
-    if (versions.length > 1) {
-      const { version } = await prompts({
-        type: "select",
-        name: "version",
-        message: "Select a version",
-        choices: versions.map((v) => ({ title: v, value: v })),
-      });
-      if (!version) {
-        console.log("Operation cancelled.");
-        process.exit(0);
-      }
-      selectedVersion = version;
-    } else if (versions.length === 1) {
-      selectedVersion = versions[0]!;
-    } else {
-      selectedVersion = "latest"; // Default/Unknown
+    // 4. Select version
+    const selectedVersion = await promptVersion(registry);
+    if (selectedVersion === "") {
+      console.log("Operation cancelled.");
+      process.exit(0);
     }
 
-    // 4. Select Type (snippet or module)
-    const { selectedType } = await prompts({
-      type: "select",
-      name: "selectedType",
-      message: "What do you want to add?",
-      choices: [
-        { title: "Snippet (single file)", value: "snippet" },
-        { title: "Module (multi-file)", value: "module" },
-        { title: "All", value: "all" },
-      ],
-    });
-
+    // 5. Select type
+    const selectedType = await promptSnippetType();
     if (!selectedType) {
       console.log("Operation cancelled.");
       process.exit(0);
     }
 
-    // 5. Filter by version and type
-    const filteredByVersionAndType = registry.filter((item) => {
-      const versionMatch =
-        !selectedVersion ||
-        selectedVersion === "latest" ||
-        item.version === selectedVersion;
-      const typeMatch = selectedType === "all" || item.type === selectedType;
-      return versionMatch && typeMatch;
-    });
+    // 6. Filter by version and type
+    const filteredItems = filterByVersionAndType(
+      registry,
+      selectedVersion,
+      selectedType
+    );
 
-    // Group by category for better UX
-    const categories = Array.from(
-      new Set(
-        filteredByVersionAndType.map((item) => item.category || "uncategorized")
-      )
-    ).sort();
-
-    // 6. Select Category (optional grouping)
-    let filteredSnippets = filteredByVersionAndType;
-    if (categories.length > 1) {
-      const { category } = await prompts({
-        type: "select",
-        name: "category",
-        message: "Select a category",
-        choices: [
-          { title: "All categories", value: "all" },
-          ...categories.map((c) => ({ title: c, value: c })),
-        ],
-      });
-
-      if (!category) {
-        console.log("Operation cancelled.");
-        process.exit(0);
-      }
-
-      if (category !== "all") {
-        filteredSnippets = filteredByVersionAndType.filter(
-          (item) => (item.category || "uncategorized") === category
-        );
-      }
-    }
-
-    // 7. Select Snippet
-    const { snippet } = await prompts({
-      type: "autocomplete",
-      name: "snippet",
-      message: "Select a snippet to add",
-      choices: filteredSnippets.map((item) => ({
-        title: `${item.type === "module" ? "MODULE" : "SNIPPET"} ${item.name}`,
-        value: item,
-        description: item.description,
-      })),
-    });
-
-    if (!snippet) {
+    // 7. Select category
+    const categoryFiltered = await promptCategory(filteredItems);
+    if (!categoryFiltered) {
       console.log("Operation cancelled.");
       process.exit(0);
     }
-    selectedSnippet = snippet;
 
-    // Install Flow
+    // 8. Select snippet
+    const selectedSnippet = await promptSnippet(categoryFiltered);
     if (!selectedSnippet) {
-      // Should be unreachable due to exit above, but keeps TS happy
-      process.exit(1);
-    }
-    const item = selectedSnippet;
-
-    console.log(chalk.blue(`\nInstalling ${item.name}...`));
-
-    // Install dependencies
-    if (item.dependencies?.length) {
-      const installSpinner = ora(
-        `Installing dependencies: ${item.dependencies.join(", ")}...`
-      ).start();
-      await installDependencies(item.dependencies);
-      installSpinner.succeed("Dependencies installed");
+      console.log("Operation cancelled.");
+      process.exit(0);
     }
 
-    if (item.devDependencies?.length) {
-      const devInstallSpinner = ora(
-        `Installing devDependencies: ${item.devDependencies.join(", ")}...`
-      ).start();
-      await installDependencies(item.devDependencies, true);
-      devInstallSpinner.succeed("Dev dependencies installed");
-    }
-    // Write files
-    const writeSpinner = ora("Writing files...").start();
-    for (const file of item.files) {
-      const targetPath = path.join(
-        process.cwd(),
-        destinationPath || config.componentsPath, // Modified line
-        file.name
-      );
-      await fs.ensureDir(path.dirname(targetPath));
-      await fs.writeFile(targetPath, file.content);
-    }
-    writeSpinner.succeed(
-      `Files written to ${destinationPath || config.componentsPath}`
-    );
-    // ...
-
-    console.log(chalk.green(`\nSuccessfully added ${item.name}!`));
+    // 9. Install snippet
+    await installSnippet(selectedSnippet, destinationPath, config);
   });

@@ -4,9 +4,10 @@ import ora from "ora";
 import prompts from "prompts";
 import path from "path";
 import fs from "fs-extra";
-import { installDependencies } from "../utils/install";
 
 const TEMPLATES_BASE_URL = "http://localhost:5173/templates";
+
+//types 
 
 interface TemplateBlock {
   name: string;
@@ -19,46 +20,360 @@ interface TemplateBlock {
   files: Array<{ path: string; content: string }>;
 }
 
-async function fetchTemplateRegistry(): Promise<{
+interface TemplateRegistry {
   base: TemplateBlock[];
   database: TemplateBlock[];
   auth: TemplateBlock[];
-}> {
+}
+
+interface CollectedBlockData {
+  files: Array<{ path: string; content: string }>;
+  dependencies: Record<string, string>;
+  devDependencies: Record<string, string>;
+  scripts: Record<string, string>;
+  envVars: string[];
+}
+
+// ============================================================================
+// Template Registry
+// ============================================================================
+
+async function fetchTemplateRegistry(): Promise<TemplateRegistry> {
   const res = await fetch(`${TEMPLATES_BASE_URL}/index.json`);
   if (!res.ok) {
     throw new Error(`Failed to fetch template registry: ${res.statusText}`);
   }
-  return res.json() as Promise<{
-    base: TemplateBlock[];
-    database: TemplateBlock[];
-    auth: TemplateBlock[];
-  }>;
+  return res.json() as Promise<TemplateRegistry>;
 }
 
-function mergePackageJson(
-  base: Record<string, any>,
-  overlay: Record<string, any>
-): Record<string, any> {
-  const result = { ...base };
+// ============================================================================
+// User Prompts
+// ============================================================================
 
-  // Merge dependencies
-  if (overlay.dependencies) {
-    result.dependencies = { ...result.dependencies, ...overlay.dependencies };
+/**
+ * Prompt for project name if not provided via CLI argument
+ */
+async function promptProjectName(initial?: string): Promise<string | null> {
+  if (initial) return initial;
+
+  const { name } = await prompts({
+    type: "text",
+    name: "name",
+    message: "Project name:",
+    initial: "my-api",
+  });
+
+  return name || null;
+}
+
+/**
+ * Validate project path doesn't already exist
+ */
+async function validateProjectPath(projectName: string): Promise<string> {
+  const projectPath = path.join(process.cwd(), projectName);
+  if (await fs.pathExists(projectPath)) {
+    console.log(chalk.red(`Directory ${projectName} already exists.`));
+    process.exit(1);
   }
-  if (overlay.devDependencies) {
-    result.devDependencies = {
-      ...result.devDependencies,
-      ...overlay.devDependencies,
-    };
+  return projectPath;
+}
+
+/**
+ * Prompt for framework selection
+ */
+async function promptFramework(
+  bases: TemplateBlock[],
+  cliOption?: string
+): Promise<TemplateBlock | undefined> {
+  if (cliOption) {
+    return bases.find((b) => b.name === cliOption);
   }
 
-  // Merge scripts
-  if (overlay.scripts) {
-    result.scripts = { ...result.scripts, ...overlay.scripts };
+  const { base } = await prompts({
+    type: "select",
+    name: "base",
+    message: "Select framework:",
+    choices: bases.map((b) => ({
+      title: b.name,
+      value: b,
+      description: b.description,
+    })),
+  });
+
+  return base;
+}
+
+/**
+ * Prompt for database selection
+ */
+async function promptDatabase(
+  databases: TemplateBlock[],
+  cliOption?: string
+): Promise<TemplateBlock | undefined> {
+  if (cliOption) {
+    return databases.find((d) => d.name === cliOption);
+  }
+
+  const { database } = await prompts({
+    type: "select",
+    name: "database",
+    message: "Select database:",
+    choices: [
+      { title: "None", value: null },
+      ...databases.map((d) => ({
+        title: d.name,
+        value: d,
+        description: d.description,
+      })),
+    ],
+  });
+
+  return database;
+}
+
+/**
+ * Prompt for auth selection
+ */
+async function promptAuth(
+  auths: TemplateBlock[],
+  cliOption?: string
+): Promise<TemplateBlock | undefined> {
+  if (cliOption) {
+    return auths.find((a) => a.name === cliOption);
+  }
+
+  const { auth } = await prompts({
+    type: "select",
+    name: "auth",
+    message: "Select authentication:",
+    choices: [
+      { title: "None", value: null },
+      ...auths.map((a) => ({
+        title: a.name,
+        value: a,
+        description: a.description,
+      })),
+    ],
+  });
+
+  return auth;
+}
+
+/**
+ * Prompt for package manager selection
+ */
+async function promptPackageManager(
+  cliOption?: string
+): Promise<string | null> {
+  if (cliOption) return cliOption;
+
+  const { pm } = await prompts({
+    type: "select",
+    name: "pm",
+    message: "Select package manager:",
+    choices: [
+      { title: "npm", value: "npm" },
+      { title: "pnpm", value: "pnpm" },
+      { title: "yarn", value: "yarn" },
+      { title: "bun", value: "bun" },
+    ],
+    initial: 0,
+  });
+
+  return pm || null;
+}
+
+// ============================================================================
+// Dependency Parsing
+// ============================================================================
+
+/**
+ * Parse a dependency string like "express@4.18.0" or "@types/node@20.0.0"
+ * Handles scoped packages correctly
+ */
+function parseDependencyString(dep: string): { name: string; version: string } {
+  if (dep.startsWith("@")) {
+    // Scoped package: @scope/name or @scope/name@version
+    const lastAtIndex = dep.lastIndexOf("@");
+    if (lastAtIndex > 0) {
+      return {
+        name: dep.substring(0, lastAtIndex),
+        version: dep.substring(lastAtIndex + 1),
+      };
+    }
+    return { name: dep, version: "*" };
+  }
+
+  if (dep.includes("@")) {
+    // Regular package with version: name@version
+    const [name, version] = dep.split("@");
+    return { name: name!, version: version || "*" };
+  }
+
+  // Package without version
+  return { name: dep, version: "*" };
+}
+
+/**
+ * Parse an array of dependency strings into a dependencies object
+ */
+function parseDependencies(deps: string[]): Record<string, string> {
+  const result: Record<string, string> = {};
+  for (const dep of deps) {
+    const { name, version } = parseDependencyString(dep);
+    result[name] = version;
+  }
+  return result;
+}
+
+// ============================================================================
+// Template Block Processing
+// ============================================================================
+
+/**
+ * Collect all data from selected template blocks
+ */
+function collectBlockData(blocks: TemplateBlock[]): CollectedBlockData {
+  const result: CollectedBlockData = {
+    files: [],
+    dependencies: {},
+    devDependencies: {},
+    scripts: {},
+    envVars: [],
+  };
+
+  for (const block of blocks) {
+    if (block.dependencies) {
+      Object.assign(result.dependencies, parseDependencies(block.dependencies));
+    }
+    if (block.devDependencies) {
+      Object.assign(
+        result.devDependencies,
+        parseDependencies(block.devDependencies)
+      );
+    }
+    if (block.scripts) {
+      Object.assign(result.scripts, block.scripts);
+    }
+    if (block.envVars) {
+      result.envVars.push(...block.envVars);
+    }
+    if (block.files) {
+      result.files.push(...block.files);
+    }
   }
 
   return result;
 }
+
+/**
+ * Build the final package.json object
+ */
+function buildPackageJson(
+  projectName: string,
+  data: CollectedBlockData
+): Record<string, unknown> {
+  return {
+    name: projectName,
+    version: "1.0.0",
+    type: "module",
+    scripts: data.scripts,
+    dependencies: data.dependencies,
+    devDependencies: data.devDependencies,
+  };
+}
+
+// ============================================================================
+// File Operations
+// ============================================================================
+
+/**
+ * Write all project files to disk
+ */
+async function writeProjectFiles(
+  projectPath: string,
+  projectName: string,
+  files: Array<{ path: string; content: string }>,
+  packageJson: Record<string, unknown>,
+  envVars: string[]
+): Promise<void> {
+  // Write package.json
+  await fs.writeJSON(path.join(projectPath, "package.json"), packageJson, {
+    spaces: 2,
+  });
+
+  // Write template files (skip package.json - we generate it ourselves)
+  for (const file of files) {
+    if (file.path === "package.json.hbs" || file.path === "package.json") {
+      continue;
+    }
+
+    const filePath = path.join(projectPath, file.path.replace(/\.hbs$/, ""));
+    await fs.ensureDir(path.dirname(filePath));
+
+    // Replace template variables
+    const content = file.content.replace(/\{\{projectName\}\}/g, projectName);
+    await fs.writeFile(filePath, content);
+  }
+
+  // Write .env.example
+  if (envVars.length > 0) {
+    const envContent = envVars.map((v) => `${v}=`).join("\n");
+    await fs.writeFile(path.join(projectPath, ".env.example"), envContent);
+  }
+
+  // Write .gitignore
+  await fs.writeFile(
+    path.join(projectPath, ".gitignore"),
+    `node_modules\ndist\n.env\n.env.local\n*.log\n`
+  );
+}
+
+/**
+ * Install project dependencies
+ */
+async function runPackageInstall(
+  projectPath: string,
+  packageManager: string
+): Promise<boolean> {
+  try {
+    const { execSync } = await import("child_process");
+    process.chdir(projectPath);
+    execSync(`${packageManager} install`, { stdio: "pipe" });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// ============================================================================
+// Output Messages
+// ============================================================================
+
+/**
+ * Print success message and next steps
+ */
+function printSuccessMessage(
+  projectName: string,
+  packageManager: string,
+  hasEnvVars: boolean,
+  skipInstall: boolean
+): void {
+  console.log(chalk.green(`\nProject ${projectName} created successfully!\n`));
+  console.log(chalk.blue("Next steps:"));
+  console.log(`cd ${projectName}`);
+  if (skipInstall) {
+    console.log(`${packageManager} install`);
+  }
+  if (hasEnvVars) {
+    console.log("cp .env.example .env");
+  }
+  console.log(`${packageManager} run dev\n`);
+}
+
+// ============================================================================
+// Main Command
+// ============================================================================
 
 export const create = new Command()
   .name("create")
@@ -72,38 +387,22 @@ export const create = new Command()
   .option("--auth <auth>", "Authentication (better-auth, clerk)")
   .option("--pm <pm>", "Package manager (npm, pnpm, yarn, bun)")
   .option("--skip-install", "Skip package installation")
-  .action(async (projectName, options) => {
+  .action(async (projectNameArg, options) => {
     console.log(chalk.blue("\nHanma Project Creator\n"));
 
     // 1. Get project name
+    const projectName = await promptProjectName(projectNameArg);
     if (!projectName) {
-      const { name } = await prompts({
-        type: "text",
-        name: "name",
-        message: "Project name:",
-        initial: "my-api",
-      });
-      if (!name) {
-        console.log("Operation cancelled.");
-        process.exit(0);
-      }
-      projectName = name;
+      console.log("Operation cancelled.");
+      process.exit(0);
     }
 
-    // Check if directory exists
-    const projectPath = path.join(process.cwd(), projectName);
-    if (await fs.pathExists(projectPath)) {
-      console.log(chalk.red(`Directory ${projectName} already exists.`));
-      process.exit(1);
-    }
+    // 2. Validate project path
+    const projectPath = await validateProjectPath(projectName);
 
-    // 2. Fetch template registry
+    // 3. Fetch template registry
     const spinner = ora("Fetching templates...").start();
-    let registry: {
-      base: TemplateBlock[];
-      database: TemplateBlock[];
-      auth: TemplateBlock[];
-    };
+    let registry: TemplateRegistry;
     try {
       registry = await fetchTemplateRegistry();
       spinner.succeed("Templates loaded");
@@ -113,243 +412,64 @@ export const create = new Command()
       process.exit(1);
     }
 
-    // 3. Select framework (base)
-    let selectedBase: TemplateBlock | undefined;
-    if (options.framework) {
-      selectedBase = registry.base.find((b) => b.name === options.framework);
-    } else {
-      const { base } = await prompts({
-        type: "select",
-        name: "base",
-        message: "Select framework:",
-        choices: registry.base.map((b) => ({
-          title: b.name,
-          value: b,
-          description: b.description,
-        })),
-      });
-      selectedBase = base;
-    }
-
+    // 4. Select framework
+    const selectedBase = await promptFramework(
+      registry.base,
+      options.framework
+    );
     if (!selectedBase) {
       console.log("Operation cancelled.");
       process.exit(0);
     }
 
-    // 4. Select database
-    let selectedDatabase: TemplateBlock | undefined;
-    if (options.database) {
-      selectedDatabase = registry.database.find(
-        (d) => d.name === options.database
-      );
-    } else {
-      const { database } = await prompts({
-        type: "select",
-        name: "database",
-        message: "Select database:",
-        choices: [
-          { title: "None", value: null },
-          ...registry.database.map((d) => ({
-            title: d.name,
-            value: d,
-            description: d.description,
-          })),
-        ],
-      });
-      selectedDatabase = database;
-    }
+    // 5. Select database
+    const selectedDatabase = await promptDatabase(
+      registry.database,
+      options.database
+    );
 
-    // 5. Select auth
-    let selectedAuth: TemplateBlock | undefined;
-    if (options.auth) {
-      selectedAuth = registry.auth.find((a) => a.name === options.auth);
-    } else {
-      const { auth } = await prompts({
-        type: "select",
-        name: "auth",
-        message: "Select authentication:",
-        choices: [
-          { title: "None", value: null },
-          ...registry.auth.map((a) => ({
-            title: a.name,
-            value: a,
-            description: a.description,
-          })),
-        ],
-      });
-      selectedAuth = auth;
-    }
+    // 6. Select auth
+    const selectedAuth = await promptAuth(registry.auth, options.auth);
 
-    // 6. Select package manager
-    let packageManager = options.pm || "npm";
-    if (!options.pm) {
-      const { pm } = await prompts({
-        type: "select",
-        name: "pm",
-        message: "Select package manager:",
-        choices: [
-          { title: "npm", value: "npm" },
-          { title: "pnpm", value: "pnpm" },
-          { title: "yarn", value: "yarn" },
-          { title: "bun", value: "bun" },
-        ],
-        initial: 0,
-      });
-      if (!pm) {
-        console.log("Operation cancelled.");
-        process.exit(0);
-      }
-      packageManager = pm;
+    // 7. Select package manager
+    const packageManager = await promptPackageManager(options.pm);
+    if (!packageManager) {
+      console.log("Operation cancelled.");
+      process.exit(0);
     }
 
     console.log(chalk.blue("\nCreating project...\n"));
 
-    // 6. Create project directory
+    // 8. Create project directory
     await fs.ensureDir(projectPath);
 
-    // 7. Collect all files from selected blocks
-    const allFiles: Array<{ path: string; content: string }> = [];
-    let packageJson: Record<string, any> = {};
-    const allEnvVars: string[] = [];
-    const allScripts: Record<string, string> = {};
-
+    // 9. Collect and process template data
     const blocks = [selectedBase, selectedDatabase, selectedAuth].filter(
       Boolean
     ) as TemplateBlock[];
+    const blockData = collectBlockData(blocks);
+    const packageJson = buildPackageJson(projectName, blockData);
 
-    for (const block of blocks) {
-      // Merge package.json data
-      if (block.dependencies) {
-        packageJson.dependencies = { ...packageJson.dependencies };
-        for (const dep of block.dependencies) {
-          // Handle scoped packages like @types/node
-          let name: string;
-          let version: string;
-
-          if (dep.startsWith("@")) {
-            // Scoped package: @scope/name or @scope/name@version
-            const lastAtIndex = dep.lastIndexOf("@");
-            if (lastAtIndex > 0) {
-              name = dep.substring(0, lastAtIndex);
-              version = dep.substring(lastAtIndex + 1);
-            } else {
-              name = dep;
-              version = "*";
-            }
-          } else if (dep.includes("@")) {
-            // Regular package with version: name@version
-            const [n, v] = dep.split("@");
-            name = n!;
-            version = v || "*";
-          } else {
-            // Package without version
-            name = dep;
-            version = "*";
-          }
-
-          packageJson.dependencies[name] = version;
-        }
-      }
-      if (block.devDependencies) {
-        packageJson.devDependencies = { ...packageJson.devDependencies };
-        for (const dep of block.devDependencies) {
-          let name: string;
-          let version: string;
-
-          if (dep.startsWith("@")) {
-            const lastAtIndex = dep.lastIndexOf("@");
-            if (lastAtIndex > 0) {
-              name = dep.substring(0, lastAtIndex);
-              version = dep.substring(lastAtIndex + 1);
-            } else {
-              name = dep;
-              version = "*";
-            }
-          } else if (dep.includes("@")) {
-            const [n, v] = dep.split("@");
-            name = n!;
-            version = v || "*";
-          } else {
-            name = dep;
-            version = "*";
-          }
-
-          packageJson.devDependencies[name] = version;
-        }
-      }
-      if (block.scripts) {
-        Object.assign(allScripts, block.scripts);
-      }
-      if (block.envVars) {
-        allEnvVars.push(...block.envVars);
-      }
-
-      // Collect files
-      if (block.files) {
-        allFiles.push(...block.files);
-      }
-    }
-
-    // Build final package.json
-    packageJson = {
-      name: projectName,
-      version: "1.0.0",
-      type: "module",
-      scripts: allScripts,
-      dependencies: packageJson.dependencies || {},
-      devDependencies: packageJson.devDependencies || {},
-    };
-
-    // 8. Write files
+    // 10. Write files
     const writeSpinner = ora("Writing files...").start();
-
-    // Write package.json
-    await fs.writeJSON(path.join(projectPath, "package.json"), packageJson, {
-      spaces: 2,
-    });
-
-    // Write template files (skip package.json - we generate it ourselves)
-    for (const file of allFiles) {
-      // Skip package.json files - we generate package.json from merged dependencies
-      if (file.path === "package.json.hbs" || file.path === "package.json") {
-        continue;
-      }
-
-      const filePath = path.join(projectPath, file.path.replace(/\.hbs$/, ""));
-      await fs.ensureDir(path.dirname(filePath));
-
-      // Replace template variables
-      let content = file.content;
-      content = content.replace(/\{\{projectName\}\}/g, projectName);
-
-      await fs.writeFile(filePath, content);
-    }
-
-    // Write .env.example
-    if (allEnvVars.length > 0) {
-      const envContent = allEnvVars.map((v) => `${v}=`).join("\n");
-      await fs.writeFile(path.join(projectPath, ".env.example"), envContent);
-    }
-
-    // Write .gitignore
-    await fs.writeFile(
-      path.join(projectPath, ".gitignore"),
-      `node_modules\ndist\n.env\n.env.local\n*.log\n`
+    await writeProjectFiles(
+      projectPath,
+      projectName,
+      blockData.files,
+      packageJson,
+      blockData.envVars
     );
-
     writeSpinner.succeed("Files written");
 
-    // 9. Install dependencies
+    // 11. Install dependencies
     if (!options.skipInstall) {
       const installSpinner = ora(
         `Installing dependencies with ${packageManager}...`
       ).start();
-      try {
-        const { execSync } = await import("child_process");
-        process.chdir(projectPath);
-        execSync(`${packageManager} install`, { stdio: "pipe" });
+      const success = await runPackageInstall(projectPath, packageManager);
+      if (success) {
         installSpinner.succeed("Dependencies installed");
-      } catch (error) {
+      } else {
         installSpinner.fail("Failed to install dependencies");
         console.log(
           chalk.yellow(
@@ -359,17 +479,11 @@ export const create = new Command()
       }
     }
 
-    // 10. Success message
-    console.log(
-      chalk.green(`\nProject ${projectName} created successfully!\n`)
+    // 12. Print success message
+    printSuccessMessage(
+      projectName,
+      packageManager,
+      blockData.envVars.length > 0,
+      options.skipInstall ?? false
     );
-    console.log(chalk.blue("Next steps:"));
-    console.log(`cd ${projectName}`);
-    if (options.skipInstall) {
-      console.log(`${packageManager} install`);
-    }
-    if (allEnvVars.length > 0) {
-      console.log("cp .env.example .env");
-    }
-    console.log(`${packageManager} run dev\n`);
   });
