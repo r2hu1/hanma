@@ -3,7 +3,7 @@ import { getUserPkgManager } from "./get-user-pkg-manager";
 
 export async function installDependencies(
   dependencies: string[],
-  dev: boolean = false
+  dev: boolean = false,
 ) {
   if (dependencies.length === 0) return;
 

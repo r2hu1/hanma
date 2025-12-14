@@ -36,6 +36,6 @@ export const init = new Command()
 
     console.log(chalk.green(`\nConfiguration saved to hanma.json`));
     console.log(
-      "You can now add snippets using " + chalk.cyan("hanma add <snippet>")
+      "You can now add snippets using " + chalk.cyan("hanma add <snippet>"),
     );
   });

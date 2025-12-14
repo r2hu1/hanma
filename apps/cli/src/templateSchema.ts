@@ -16,7 +16,7 @@ export const templateBlockSchema = z.object({
       z.object({
         file: z.string(),
         strategy: z.enum(["deep", "replace", "append"]).default("replace"),
-      })
+      }),
     )
     .optional(),
 });

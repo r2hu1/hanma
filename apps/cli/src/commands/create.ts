@@ -7,7 +7,7 @@ import fs from "fs-extra";
 
 const TEMPLATES_BASE_URL = "http://localhost:5173/templates";
 
-//types 
+//types
 
 interface TemplateBlock {
   name: string;
@@ -83,7 +83,7 @@ async function validateProjectPath(projectName: string): Promise<string> {
  */
 async function promptFramework(
   bases: TemplateBlock[],
-  cliOption?: string
+  cliOption?: string,
 ): Promise<TemplateBlock | undefined> {
   if (cliOption) {
     return bases.find((b) => b.name === cliOption);
@@ -108,7 +108,7 @@ async function promptFramework(
  */
 async function promptDatabase(
   databases: TemplateBlock[],
-  cliOption?: string
+  cliOption?: string,
 ): Promise<TemplateBlock | undefined> {
   if (cliOption) {
     return databases.find((d) => d.name === cliOption);
@@ -136,7 +136,7 @@ async function promptDatabase(
  */
 async function promptAuth(
   auths: TemplateBlock[],
-  cliOption?: string
+  cliOption?: string,
 ): Promise<TemplateBlock | undefined> {
   if (cliOption) {
     return auths.find((a) => a.name === cliOption);
@@ -163,7 +163,7 @@ async function promptAuth(
  * Prompt for package manager selection
  */
 async function promptPackageManager(
-  cliOption?: string
+  cliOption?: string,
 ): Promise<string | null> {
   if (cliOption) return cliOption;
 
@@ -249,7 +249,7 @@ function collectBlockData(blocks: TemplateBlock[]): CollectedBlockData {
     if (block.devDependencies) {
       Object.assign(
         result.devDependencies,
-        parseDependencies(block.devDependencies)
+        parseDependencies(block.devDependencies),
       );
     }
     if (block.scripts) {
@@ -271,7 +271,7 @@ function collectBlockData(blocks: TemplateBlock[]): CollectedBlockData {
  */
 function buildPackageJson(
   projectName: string,
-  data: CollectedBlockData
+  data: CollectedBlockData,
 ): Record<string, unknown> {
   return {
     name: projectName,
@@ -295,7 +295,7 @@ async function writeProjectFiles(
   projectName: string,
   files: Array<{ path: string; content: string }>,
   packageJson: Record<string, unknown>,
-  envVars: string[]
+  envVars: string[],
 ): Promise<void> {
   // Write package.json
   await fs.writeJSON(path.join(projectPath, "package.json"), packageJson, {
@@ -325,7 +325,7 @@ async function writeProjectFiles(
   // Write .gitignore
   await fs.writeFile(
     path.join(projectPath, ".gitignore"),
-    `node_modules\ndist\n.env\n.env.local\n*.log\n`
+    `node_modules\ndist\n.env\n.env.local\n*.log\n`,
   );
 }
 
@@ -334,7 +334,7 @@ async function writeProjectFiles(
  */
 async function runPackageInstall(
   projectPath: string,
-  packageManager: string
+  packageManager: string,
 ): Promise<boolean> {
   try {
     const { execSync } = await import("child_process");
@@ -357,7 +357,7 @@ function printSuccessMessage(
   projectName: string,
   packageManager: string,
   hasEnvVars: boolean,
-  skipInstall: boolean
+  skipInstall: boolean,
 ): void {
   console.log(chalk.green(`\nProject ${projectName} created successfully!\n`));
   console.log(chalk.blue("Next steps:"));
@@ -382,7 +382,7 @@ export const create = new Command()
   .option("--framework <framework>", "Base framework (express, hono)")
   .option(
     "--database <database>",
-    "Database setup (drizzle-postgres, prisma-postgres)"
+    "Database setup (drizzle-postgres, prisma-postgres)",
   )
   .option("--auth <auth>", "Authentication (better-auth, clerk)")
   .option("--pm <pm>", "Package manager (npm, pnpm, yarn, bun)")
@@ -415,7 +415,7 @@ export const create = new Command()
     // 4. Select framework
     const selectedBase = await promptFramework(
       registry.base,
-      options.framework
+      options.framework,
     );
     if (!selectedBase) {
       console.log("Operation cancelled.");
@@ -425,7 +425,7 @@ export const create = new Command()
     // 5. Select database
     const selectedDatabase = await promptDatabase(
       registry.database,
-      options.database
+      options.database,
     );
 
     // 6. Select auth
@@ -445,7 +445,7 @@ export const create = new Command()
 
     // 9. Collect and process template data
     const blocks = [selectedBase, selectedDatabase, selectedAuth].filter(
-      Boolean
+      Boolean,
     ) as TemplateBlock[];
     const blockData = collectBlockData(blocks);
     const packageJson = buildPackageJson(projectName, blockData);
@@ -457,14 +457,14 @@ export const create = new Command()
       projectName,
       blockData.files,
       packageJson,
-      blockData.envVars
+      blockData.envVars,
     );
     writeSpinner.succeed("Files written");
 
     // 11. Install dependencies
     if (!options.skipInstall) {
       const installSpinner = ora(
-        `Installing dependencies with ${packageManager}...`
+        `Installing dependencies with ${packageManager}...`,
       ).start();
       const success = await runPackageInstall(projectPath, packageManager);
       if (success) {
@@ -473,8 +473,8 @@ export const create = new Command()
         installSpinner.fail("Failed to install dependencies");
         console.log(
           chalk.yellow(
-            `Run '${packageManager} install' manually in the project directory.`
-          )
+            `Run '${packageManager} install' manually in the project directory.`,
+          ),
         );
       }
     }
@@ -484,6 +484,6 @@ export const create = new Command()
       projectName,
       packageManager,
       blockData.envVars.length > 0,
-      options.skipInstall ?? false
+      options.skipInstall ?? false,
     );
   });

@@ -33,8 +33,8 @@ async function promptFramework(frameworks: string[]): Promise<string | null> {
 async function promptVersion(registry: RegistryItem[]): Promise<string> {
   const versions = Array.from(
     new Set(
-      registry.map((item) => item.version).filter((v): v is string => !!v)
-    )
+      registry.map((item) => item.version).filter((v): v is string => !!v),
+    ),
   );
 
   if (versions.length > 1) {
@@ -62,7 +62,7 @@ async function promptVersion(registry: RegistryItem[]): Promise<string> {
  */
 function filterModules(
   registry: RegistryItem[],
-  version: string
+  version: string,
 ): RegistryItem[] {
   return registry.filter((item) => {
     const versionMatch =
@@ -76,10 +76,10 @@ function filterModules(
  * Prompt for category selection and filter items
  */
 async function promptCategory(
-  items: RegistryItem[]
+  items: RegistryItem[],
 ): Promise<RegistryItem[] | null> {
   const categories = Array.from(
-    new Set(items.map((item) => item.category || "uncategorized"))
+    new Set(items.map((item) => item.category || "uncategorized")),
   ).sort();
 
   if (categories.length <= 1) {
@@ -105,7 +105,7 @@ async function promptCategory(
   }
 
   return items.filter(
-    (item) => (item.category || "uncategorized") === category
+    (item) => (item.category || "uncategorized") === category,
   );
 }
 
@@ -113,7 +113,7 @@ async function promptCategory(
  * Prompt for module selection from filtered list
  */
 async function promptModule(
-  items: RegistryItem[]
+  items: RegistryItem[],
 ): Promise<RegistryItem | null> {
   const { module } = await prompts({
     type: "autocomplete",
@@ -139,14 +139,14 @@ async function promptModule(
 async function installModule(
   item: RegistryItem,
   destinationPath: string | undefined,
-  config: HanmaConfig
+  config: HanmaConfig,
 ): Promise<void> {
   console.log(chalk.blue(`\nInstalling module: ${item.name}...`));
 
   // Install dependencies
   if (item.dependencies?.length) {
     const installSpinner = ora(
-      `Installing dependencies: ${item.dependencies.join(", ")}...`
+      `Installing dependencies: ${item.dependencies.join(", ")}...`,
     ).start();
     await installDependencies(item.dependencies);
     installSpinner.succeed("Dependencies installed");
@@ -155,7 +155,7 @@ async function installModule(
   // Install dev dependencies
   if (item.devDependencies?.length) {
     const devInstallSpinner = ora(
-      `Installing devDependencies: ${item.devDependencies.join(", ")}...`
+      `Installing devDependencies: ${item.devDependencies.join(", ")}...`,
     ).start();
     await installDependencies(item.devDependencies, true);
     devInstallSpinner.succeed("Dev dependencies installed");
@@ -186,18 +186,18 @@ export const module = new Command()
   .description("Add a multi-file module to your project")
   .argument(
     "[module]",
-    "The module to add (optional, use interactive mode if omitted)"
+    "The module to add (optional, use interactive mode if omitted)",
   )
   .argument(
     "[path]",
-    "The destination path (optional, defaults to config.componentsPath)"
+    "The destination path (optional, defaults to config.componentsPath)",
   )
   .action(async (moduleName, destinationPath) => {
     // 1. Get config
     const config = await getConfig();
     if (!config) {
       console.log(
-        chalk.red("Configuration not found. Please run 'hanma init' first.")
+        chalk.red("Configuration not found. Please run 'hanma init' first."),
       );
       process.exit(1);
     }
@@ -222,7 +222,7 @@ export const module = new Command()
 
     // 3. Fetch registry
     const registrySpinner = ora(
-      `Fetching registry for ${selectedFramework}...`
+      `Fetching registry for ${selectedFramework}...`,
     ).start();
     let registry: RegistryItem[] = [];
     try {
@@ -246,7 +246,9 @@ export const module = new Command()
 
     if (modules.length === 0) {
       console.log(
-        chalk.yellow("No modules found for the selected framework and version.")
+        chalk.yellow(
+          "No modules found for the selected framework and version.",
+        ),
       );
       process.exit(0);
     }

@@ -56,7 +56,7 @@ async function main() {
 
           const content = await fs.readFile(fullPath, "utf-8");
           const frontmatterMatch = content.match(
-            /^---\n([\s\S]*?)\n---\n([\s\S]*)$/
+            /^---\n([\s\S]*?)\n---\n([\s\S]*)$/,
           );
 
           if (!frontmatterMatch) {
@@ -101,7 +101,7 @@ async function main() {
                 try {
                   let rawSource = await fs.readFile(sourcePath, "utf-8");
                   const sourceMatch = rawSource.match(
-                    /^---\n([\s\S]*?)\n---\n([\s\S]*)$/
+                    /^---\n([\s\S]*?)\n---\n([\s\S]*)$/,
                   );
                   if (sourceMatch) {
                     fileContent = sourceMatch[2];
@@ -111,7 +111,7 @@ async function main() {
                 } catch (err) {
                   console.error(
                     `Error reading source ${f.source} for ${meta.name}`,
-                    err
+                    err,
                   );
                   // Skip file or continue? Continue with empty content might break things.
                   continue;
@@ -139,7 +139,7 @@ async function main() {
     await fs.writeJSON(
       path.join(REGISTRY_DIR, `${frameworkName}.json`),
       frameworkRegistry,
-      { spaces: 2 }
+      { spaces: 2 },
     );
   }
 

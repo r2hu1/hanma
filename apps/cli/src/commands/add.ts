@@ -33,8 +33,8 @@ async function promptFramework(frameworks: string[]): Promise<string | null> {
 async function promptVersion(registry: RegistryItem[]): Promise<string> {
   const versions = Array.from(
     new Set(
-      registry.map((item) => item.version).filter((v): v is string => !!v)
-    )
+      registry.map((item) => item.version).filter((v): v is string => !!v),
+    ),
   );
 
   if (versions.length > 1) {
@@ -62,7 +62,7 @@ async function promptVersion(registry: RegistryItem[]): Promise<string> {
  */
 function filterSnippets(
   registry: RegistryItem[],
-  version: string
+  version: string,
 ): RegistryItem[] {
   return registry.filter((item) => {
     const versionMatch =
@@ -76,10 +76,10 @@ function filterSnippets(
  * Prompt for category selection and filter items
  */
 async function promptCategory(
-  items: RegistryItem[]
+  items: RegistryItem[],
 ): Promise<RegistryItem[] | null> {
   const categories = Array.from(
-    new Set(items.map((item) => item.category || "uncategorized"))
+    new Set(items.map((item) => item.category || "uncategorized")),
   ).sort();
 
   if (categories.length <= 1) {
@@ -105,7 +105,7 @@ async function promptCategory(
   }
 
   return items.filter(
-    (item) => (item.category || "uncategorized") === category
+    (item) => (item.category || "uncategorized") === category,
   );
 }
 
@@ -113,7 +113,7 @@ async function promptCategory(
  * Prompt for snippet selection from filtered list
  */
 async function promptSnippet(
-  items: RegistryItem[]
+  items: RegistryItem[],
 ): Promise<RegistryItem | null> {
   const { snippet } = await prompts({
     type: "autocomplete",
@@ -139,14 +139,14 @@ async function promptSnippet(
 async function installSnippet(
   item: RegistryItem,
   destinationPath: string | undefined,
-  config: HanmaConfig
+  config: HanmaConfig,
 ): Promise<void> {
   console.log(chalk.blue(`\nInstalling snippet: ${item.name}...`));
 
   // Install dependencies
   if (item.dependencies?.length) {
     const installSpinner = ora(
-      `Installing dependencies: ${item.dependencies.join(", ")}...`
+      `Installing dependencies: ${item.dependencies.join(", ")}...`,
     ).start();
     await installDependencies(item.dependencies);
     installSpinner.succeed("Dependencies installed");
@@ -155,7 +155,7 @@ async function installSnippet(
   // Install dev dependencies
   if (item.devDependencies?.length) {
     const devInstallSpinner = ora(
-      `Installing devDependencies: ${item.devDependencies.join(", ")}...`
+      `Installing devDependencies: ${item.devDependencies.join(", ")}...`,
     ).start();
     await installDependencies(item.devDependencies, true);
     devInstallSpinner.succeed("Dev dependencies installed");
@@ -184,18 +184,18 @@ export const add = new Command()
   .description("Add a snippet to your project")
   .argument(
     "[snippet]",
-    "The snippet to add (optional, use interactive mode if omitted)"
+    "The snippet to add (optional, use interactive mode if omitted)",
   )
   .argument(
     "[path]",
-    "The destination path (optional, defaults to config.componentsPath)"
+    "The destination path (optional, defaults to config.componentsPath)",
   )
   .action(async (snippetName, destinationPath) => {
     // 1. Get config
     const config = await getConfig();
     if (!config) {
       console.log(
-        chalk.red("Configuration not found. Please run 'hanma init' first.")
+        chalk.red("Configuration not found. Please run 'hanma init' first."),
       );
       process.exit(1);
     }
@@ -220,7 +220,7 @@ export const add = new Command()
 
     // 3. Fetch registry
     const registrySpinner = ora(
-      `Fetching registry for ${selectedFramework}...`
+      `Fetching registry for ${selectedFramework}...`,
     ).start();
     let registry: RegistryItem[] = [];
     try {
@@ -245,8 +245,8 @@ export const add = new Command()
     if (snippets.length === 0) {
       console.log(
         chalk.yellow(
-          "No snippets found for the selected framework and version."
-        )
+          "No snippets found for the selected framework and version.",
+        ),
       );
       process.exit(0);
     }

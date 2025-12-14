@@ -11,11 +11,11 @@ We welcome contributions to the snippets library!
 
 ## Naming Conventions
 
--   **Directories**: Lowercase, kebab-case.
--   **Snippet Name**: Format as `<framework>-v<version>-<feature>`, e.g., `express-v5-cors`.
+- **Directories**: Lowercase, kebab-case.
+- **Snippet Name**: Format as `<framework>-v<version>-<feature>`, e.g., `express-v5-cors`.
 
 ## Guidelines
 
--   Make snippets as dynamic as possible.
--   Include types where applicable.
--   Avoid hardcoded values; use environment variables or configuration objects.
+- Make snippets as dynamic as possible.
+- Include types where applicable.
+- Avoid hardcoded values; use environment variables or configuration objects.
