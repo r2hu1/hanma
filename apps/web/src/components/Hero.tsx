@@ -3,6 +3,7 @@ import { LuSearch, LuGithub, LuCopy, LuCheck } from "react-icons/lu";
 const Hero = () => {
   return (
     <section className="pt-32 pb-20 px-6 relative overflow-hidden">
+      
       {/* Grid accents */}
       <div className="absolute top-0 right-0 p-32 bg-secondary/10 blur-3xl rounded-full translate-x-1/2 -translate-y-1/2 pointer-events-none"></div>
 
