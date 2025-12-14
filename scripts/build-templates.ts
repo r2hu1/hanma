@@ -6,8 +6,8 @@ import yaml from "js-yaml";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const TEMPLATES_DIR = path.resolve(__dirname, "../packages/templates");
-const SNIPPETS_DIR = path.resolve(__dirname, "../packages/snippets");
+const TEMPLATES_DIR = path.resolve(__dirname, "../apps/cli/content/templates");
+const SNIPPETS_DIR = path.resolve(__dirname, "../apps/cli/content/snippets");
 const PUBLIC_DIR = path.resolve(__dirname, "../apps/web/public");
 
 interface TemplateBlock {

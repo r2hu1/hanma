@@ -6,7 +6,7 @@ import yaml from "js-yaml";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const SNIPPETS_DIR = path.resolve(__dirname, "../packages/snippets");
+const SNIPPETS_DIR = path.resolve(__dirname, "../apps/cli/content/snippets");
 const PUBLIC_DIR = path.resolve(__dirname, "../apps/web/public");
 
 async function main() {
