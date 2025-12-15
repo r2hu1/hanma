@@ -1,0 +1,127 @@
+---
+name: sanitize-input
+description: Input sanitization middleware to prevent XSS attacks
+dependencies:
+  - sanitize-html
+devDependencies:
+  - "@types/sanitize-html"
+  - "@types/express"
+files:
+  - name: middleware/security/sanitize.ts
+---
+import { Request, Response, NextFunction } from 'express';
+import sanitizeHtml from 'sanitize-html';
+
+/**
+ * Sanitization options
+ * Strips all HTML by default - adjust based on your needs
+ */
+const strictOptions: sanitizeHtml.IOptions = {
+  allowedTags: [],
+  allowedAttributes: {},
+  disallowedTagsMode: 'discard',
+};
+
+/**
+ * Allow basic formatting tags (for rich text fields)
+ */
+const richTextOptions: sanitizeHtml.IOptions = {
+  allowedTags: ['b', 'i', 'u', 'em', 'strong', 'a', 'p', 'br', 'ul', 'ol', 'li'],
+  allowedAttributes: {
+    a: ['href', 'title', 'target'],
+  },
+  allowedSchemes: ['http', 'https', 'mailto'],
+};
+
+/**
+ * Recursively sanitize all string values in an object
+ */
+const sanitizeObject = (
+  obj: unknown,
+  options: sanitizeHtml.IOptions = strictOptions
+): unknown => {
+  if (typeof obj === 'string') {
+    return sanitizeHtml(obj, options).trim();
+  }
+
+  if (Array.isArray(obj)) {
+    return obj.map((item) => sanitizeObject(item, options));
+  }
+
+  if (obj !== null && typeof obj === 'object') {
+    const sanitized: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(obj)) {
+      sanitized[key] = sanitizeObject(value, options);
+    }
+    return sanitized;
+  }
+
+  return obj;
+};
+
+/**
+ * Strict sanitization middleware
+ * Removes ALL HTML tags from request body, query, and params
+ */
+export const sanitizeStrict = (
+  req: Request,
+  _res: Response,
+  next: NextFunction
+) => {
+  if (req.body) {
+    req.body = sanitizeObject(req.body, strictOptions);
+  }
+  if (req.query) {
+    req.query = sanitizeObject(req.query, strictOptions) as typeof req.query;
+  }
+  if (req.params) {
+    req.params = sanitizeObject(req.params, strictOptions) as typeof req.params;
+  }
+  next();
+};
+
+/**
+ * Rich text sanitization middleware
+ * Allows basic formatting tags but strips dangerous content
+ */
+export const sanitizeRichText = (
+  req: Request,
+  _res: Response,
+  next: NextFunction
+) => {
+  if (req.body) {
+    req.body = sanitizeObject(req.body, richTextOptions);
+  }
+  next();
+};
+
+/**
+ * Sanitize specific fields only
+ * @param fields - Array of field names to sanitize in request body
+ * @param allowRichText - If true, allows basic formatting tags
+ */
+export const sanitizeFields = (fields: string[], allowRichText = false) => {
+  const options = allowRichText ? richTextOptions : strictOptions;
+
+  return (req: Request, _res: Response, next: NextFunction) => {
+    if (req.body && typeof req.body === 'object') {
+      for (const field of fields) {
+        if (field in req.body && typeof req.body[field] === 'string') {
+          req.body[field] = sanitizeHtml(req.body[field], options).trim();
+        }
+      }
+    }
+    next();
+  };
+};
+
+/**
+ * Utility function for manual sanitization
+ */
+export const sanitize = (
+  input: string,
+  allowRichText = false
+): string => {
+  const options = allowRichText ? richTextOptions : strictOptions;
+  return sanitizeHtml(input, options).trim();
+};
