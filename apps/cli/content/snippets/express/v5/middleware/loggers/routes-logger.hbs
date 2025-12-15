@@ -1,3 +1,12 @@
+---
+name: routes-logger
+description: Utility to log all registered Express routes on startup
+dependencies: []
+devDependencies:
+  - "@types/express"
+files:
+  - name: middleware/routes-logger.ts
+---
 import type { Express } from "express";
 
 /** Normalize and clean Express regex paths */
@@ -7,8 +16,8 @@ const cleanPath = (path: string): string => {
       // Remove Express-specific regex tokens
       .replace(/\\\//g, "/")
       .replace(/\(\?:\^\)\?/g, "")
-      .replace(/\(\?\=\\\/\|\$\)/g, "")
-      .replace(/\/\?\(\?\=\/\|\$\)/g, "") // <- removes /?(?=/|$)
+      .replace(/\(\?=\\\/\|\$\)/g, "")
+      .replace(/\/\?\(\?=\/\|\$\)/g, "") // <- removes /?(?=/|$)
       .replace(/\^\?/g, "")
       .replace(/\$$/g, "")
       // Collapse multiple slashes
@@ -43,6 +52,6 @@ export const logRoutes = (app: Express) => {
 
   extractRoutes(app._router.stack);
 
-  console.log("📜 Registered Routes:");
+  console.log("Registered Routes:");
   routes.forEach((r) => console.log(`${r.method.padEnd(6)} ${r.path}`));
 };
