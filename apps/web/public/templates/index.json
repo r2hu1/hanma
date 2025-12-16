@@ -1,0 +1,887 @@
+{
+  "base": [
+    {
+      "name": "express",
+      "category": "base",
+      "description": "Express.js v5 API starter with TypeScript",
+      "framework": "express",
+      "version": "5",
+      "dependencies": [
+        "zod",
+        "cors"
+      ],
+      "devDependencies": [
+        "typescript",
+        "@types/node",
+        "tsx",
+        "@types/cors"
+      ],
+      "scripts": {
+        "dev": "tsx watch src/index.ts",
+        "build": "tsc",
+        "start": "node dist/index.js"
+      },
+      "envVars": [
+        "PORT=3000",
+        "NODE_ENV=development"
+      ],
+      "files": [
+        {
+          "path": "src/libs/cors.ts",
+          "content": "import cors, { CorsOptions } from \"cors\";\n\n/**\n * Parses environment variables to get allowed origins, methods, and headers.\n */\nconst getEnvConfig = () => {\n  const allowedOrigins: string[] = (process.env.CORS_ORIGINS ?? \"\")\n    .split(\",\")\n    .map((o: string) => o.trim())\n    .filter((o: string) => o.length > 0);\n\n  const allowedMethods: string[] = (process.env.CORS_METHODS ?? \"\")\n    .split(\",\")\n    .map((m: string) => m.trim())\n    .filter((m: string) => m.length > 0);\n\n  const allowedHeaders: string[] = (process.env.CORS_HEADERS ?? \"\")\n    .split(\",\")\n    .map((h: string) => h.trim())\n    .filter((h: string) => h.length > 0);\n\n  return { allowedOrigins, allowedMethods, allowedHeaders };\n};\n\nexport const { allowedOrigins, allowedMethods, allowedHeaders } =\n  getEnvConfig();\n\n/**\n * Creates valid CorsOptions based on provided or environment configuration.\n */\nexport const createCorsOptions = (\n  overrides?: Partial<CorsOptions> & {\n    origins?: string[];\n    methods?: string[];\n    headers?: string[];\n  }\n): CorsOptions => {\n  const origins = overrides?.origins ?? allowedOrigins;\n  const methods = overrides?.methods ?? allowedMethods;\n  const headers = overrides?.headers ?? allowedHeaders;\n\n  return {\n    origin: (\n      origin: string | undefined,\n      callback: (error: Error | null, allow?: boolean) => void\n    ) => {\n      // Allow requests with no origin (mobile apps, curl, same-origin)\n      if (!origin) return callback(null, true);\n\n      if (origins.length === 0 || origins.includes(origin)) {\n        callback(null, true);\n      } else {\n        callback(new Error(\"Not allowed by CORS\"));\n      }\n    },\n    methods,\n    allowedHeaders: headers,\n    credentials: true,\n    ...overrides,\n  };\n};\n\n/**\n * Check if critical CORS configuration is missing.\n * Useful for validating environment setup on startup.\n */\nexport const validateCorsConfig = () => {\n  if (\n    !allowedOrigins.length ||\n    !allowedMethods.length ||\n    !allowedHeaders.length\n  ) {\n    console.warn(\n      \" CORS configuration might be incomplete. Check CORS_ORIGINS, CORS_METHODS, and CORS_HEADERS .env variables.\"\n    );\n    return false;\n  }\n  return true;\n};\n\n// Default export uses strict environment variables but doesn't hard exit only warns if missing,\n// unless strict validation is called.\nconst defaultOptions = createCorsOptions();\nexport const corsMiddleware = cors(defaultOptions);\n"
+        },
+        {
+          "path": ".env.example",
+          "content": "# Environment\nNODE_ENV=development\nPORT=3000\n\n# Add your environment variables below\n"
+        },
+        {
+          "path": "package.json.hbs",
+          "content": "{\n  \"name\": \"{{projectName}}\",\n  \"version\": \"1.0.0\",\n  \"type\": \"module\",\n  \"scripts\": {\n    \"dev\": \"tsx watch src/index.ts\",\n    \"build\": \"tsc\",\n    \"start\": \"node dist/index.js\"\n  },\n  \"dependencies\": {\n    \"express\": \"^5.0.0\",\n    \"dotenv\": \"^16.3.1\",\n    \"zod\": \"^3.22.4\"\n  },\n  \"devDependencies\": {\n    \"typescript\": \"^5.3.3\",\n    \"@types/express\": \"^5.0.0\",\n    \"@types/node\": \"^20.10.0\",\n    \"tsx\": \"^4.7.0\"\n  }\n}\n"
+        },
+        {
+          "path": "src/index.ts.hbs",
+          "content": "import { shutdown, startServer } from \"@/libs/server\";\n\nstartServer();\n\nprocess.on(\"SIGTERM\", () => shutdown(\"SIGTERM\"));\nprocess.on(\"SIGINT\", () => shutdown(\"SIGINT\"));\n\nprocess.on(\"unhandledRejection\", (reason, p) => {\n  console.error(\"Unhandled Rejection at:\", p, \"reason:\", reason);\n});\n\nprocess.on(\"uncaughtException\", (err) => {\n  console.error(\"Uncaught Exception:\", err);\n  process.exit(1);\n});"
+        },
+        {
+          "path": "tsconfig.json",
+          "content": "{\n  \"compilerOptions\": {\n    \"target\": \"ES2022\",\n    \"module\": \"CommonJS\",\n    \"rootDir\": \"./src\",\n    \"outDir\": \"./dist\",\n    \"strict\": true,\n    \"esModuleInterop\": true,\n    \"skipLibCheck\": true,\n    \"forceConsistentCasingInFileNames\": true,\n    \"baseUrl\": \".\",\n    \"paths\": {\n      \"@/*\": [\"src/*\"]\n    },\n    \"resolveJsonModule\": true,\n    \"allowSyntheticDefaultImports\": true,\n    \"types\": [\"node\"]\n  },\n  \"include\": [\"src/**/*\"],\n  \"exclude\": [\"node_modules\", \"dist\"]\n}"
+        }
+      ]
+    },
+    {
+      "name": "express-graphql",
+      "category": "base",
+      "description": "Apollo GraphQL server with Express integration",
+      "framework": "express",
+      "version": "5",
+      "dependencies": [
+        "express",
+        "@apollo/server",
+        "graphql",
+        "cors",
+        "dotenv"
+      ],
+      "devDependencies": [
+        "typescript",
+        "@types/node",
+        "@types/express",
+        "@types/cors",
+        "tsx"
+      ],
+      "scripts": {
+        "dev": "tsx watch src/index.ts",
+        "build": "tsc",
+        "start": "node dist/index.js"
+      },
+      "envVars": [
+        "PORT=4000",
+        "NODE_ENV=development"
+      ],
+      "files": [
+        {
+          "path": "src/libs/graphql-server.ts",
+          "content": "import { ApolloServer } from '@apollo/server';\nimport { expressMiddleware } from '@apollo/server/express4';\nimport { ApolloServerPluginDrainHttpServer } from '@apollo/server/plugin/drainHttpServer';\nimport express from 'express';\nimport http from 'http';\nimport cors from 'cors';\n\n/**\n * GraphQL type definitions\n * Replace with your actual schema\n */\nconst typeDefs = `#graphql\n  type Query {\n    hello: String\n    health: HealthStatus\n  }\n\n  type HealthStatus {\n    status: String!\n    timestamp: String!\n  }\n`;\n\n/**\n * GraphQL resolvers\n * Replace with your actual resolvers\n */\nconst resolvers = {\n  Query: {\n    hello: () => 'Hello from GraphQL!',\n    health: () => ({\n      status: 'ok',\n      timestamp: new Date().toISOString(),\n    }),\n  },\n};\n\n/**\n * Context interface for type-safe resolvers\n */\nexport interface GraphQLContext {\n  // Add your context properties here\n  // user?: { id: string; email: string };\n}\n\n/**\n * Create and configure Apollo Server with Express\n */\nexport const createGraphQLServer = async (port = 4000) => {\n  const app = express();\n  const httpServer = http.createServer(app);\n\n  const server = new ApolloServer<GraphQLContext>({\n    typeDefs,\n    resolvers,\n    plugins: [\n      // Graceful shutdown plugin\n      ApolloServerPluginDrainHttpServer({ httpServer }),\n    ],\n    // Disable introspection in production\n    introspection: process.env.NODE_ENV !== 'production',\n  });\n\n  await server.start();\n\n  app.use(\n    '/graphql',\n    cors<cors.CorsRequest>(),\n    express.json(),\n    expressMiddleware(server, {\n      context: async ({ req }) => {\n        // Build your context here\n        // const token = req.headers.authorization || '';\n        // const user = await getUser(token);\n        return {\n          // user,\n        };\n      },\n    })\n  );\n\n  // Health check endpoint\n  app.get('/health', (_req, res) => {\n    res.json({ status: 'ok', timestamp: new Date().toISOString() });\n  });\n\n  await new Promise<void>((resolve) =>\n    httpServer.listen({ port }, resolve)\n  );\n\n  console.log(`GraphQL server running at http://localhost:${port}/graphql`);\n\n  return { app, httpServer, server };\n};\n\n/**\n * Start the server\n */\nif (require.main === module) {\n  createGraphQLServer().catch(console.error);\n}\n"
+        },
+        {
+          "path": "src/index.ts.hbs",
+          "content": "import { startGraphQLServer, shutdownGraphQLServer } from \"@/libs/graphql-server\";\n\nstartGraphQLServer();\n\nprocess.on(\"SIGTERM\", () => shutdownGraphQLServer(\"SIGTERM\"));\nprocess.on(\"SIGINT\", () => shutdownGraphQLServer(\"SIGINT\"));\n\nprocess.on(\"unhandledRejection\", (reason, p) => {\n  console.error(\"Unhandled Rejection at:\", p, \"reason:\", reason);\n});\n\nprocess.on(\"uncaughtException\", (err) => {\n  console.error(\"Uncaught Exception:\", err);\n  process.exit(1);\n});\n"
+        },
+        {
+          "path": "tsconfig.json",
+          "content": "{\n  \"compilerOptions\": {\n    \"target\": \"ES2022\",\n    \"module\": \"NodeNext\",\n    \"moduleResolution\": \"NodeNext\",\n    \"esModuleInterop\": true,\n    \"strict\": true,\n    \"skipLibCheck\": true,\n    \"outDir\": \"dist\",\n    \"rootDir\": \"src\",\n    \"baseUrl\": \".\",\n    \"paths\": {\n      \"@/*\": [\"src/*\"]\n    }\n  },\n  \"include\": [\"src/**/*\"],\n  \"exclude\": [\"node_modules\", \"dist\"]\n}\n"
+        }
+      ]
+    },
+    {
+      "name": "express-minimal",
+      "category": "base",
+      "description": "Minimal Express.js v5 setup with TypeScript",
+      "framework": "express",
+      "version": "5",
+      "dependencies": [
+        "express",
+        "dotenv"
+      ],
+      "devDependencies": [
+        "typescript",
+        "@types/node",
+        "@types/express",
+        "tsx"
+      ],
+      "scripts": {
+        "dev": "tsx watch src/index.ts",
+        "build": "tsc",
+        "start": "node dist/index.js"
+      },
+      "envVars": [
+        "PORT=3000",
+        "NODE_ENV=development"
+      ],
+      "files": [
+        {
+          "path": "src/index.ts.hbs",
+          "content": "import express from \"express\";\nimport dotenv from \"dotenv\";\n\ndotenv.config();\n\nconst app = express();\nconst PORT = process.env.PORT || 3000;\n\n// Middleware\napp.use(express.json());\n\n// Health check\napp.get(\"/health\", (_req, res) => {\n  res.json({ status: \"ok\", timestamp: new Date().toISOString() });\n});\n\n// Start server\nconst server = app.listen(PORT, () => {\n  console.log(`Server running on http://localhost:${PORT}`);\n});\n\n// Graceful shutdown\nconst shutdown = (signal: string) => {\n  console.log(`\\n${signal} received. Shutting down gracefully...`);\n  server.close(() => {\n    console.log(\"Server closed\");\n    process.exit(0);\n  });\n};\n\nprocess.on(\"SIGTERM\", () => shutdown(\"SIGTERM\"));\nprocess.on(\"SIGINT\", () => shutdown(\"SIGINT\"));\n"
+        },
+        {
+          "path": "tsconfig.json",
+          "content": "{\n  \"compilerOptions\": {\n    \"target\": \"ES2022\",\n    \"module\": \"NodeNext\",\n    \"moduleResolution\": \"NodeNext\",\n    \"esModuleInterop\": true,\n    \"strict\": true,\n    \"skipLibCheck\": true,\n    \"outDir\": \"dist\",\n    \"rootDir\": \"src\",\n    \"baseUrl\": \".\",\n    \"paths\": {\n      \"@/*\": [\"src/*\"]\n    }\n  },\n  \"include\": [\"src/**/*\"],\n  \"exclude\": [\"node_modules\", \"dist\"]\n}\n"
+        }
+      ]
+    },
+    {
+      "name": "express-rest-api",
+      "category": "base",
+      "description": "Production-ready REST API with validation, error handling, and structured routing",
+      "framework": "express",
+      "version": "5",
+      "dependencies": [
+        "express",
+        "cors",
+        "helmet",
+        "zod",
+        "dotenv"
+      ],
+      "devDependencies": [
+        "typescript",
+        "@types/node",
+        "@types/express",
+        "@types/cors",
+        "tsx"
+      ],
+      "scripts": {
+        "dev": "tsx watch src/index.ts",
+        "build": "tsc",
+        "start": "node dist/index.js"
+      },
+      "envVars": [
+        "PORT=3000",
+        "NODE_ENV=development",
+        "CORS_ORIGIN=http://localhost:3000"
+      ],
+      "files": [
+        {
+          "path": "src/libs/server.ts",
+          "content": "import http from \"http\";\nimport express from \"express\";\nimport cors from \"cors\";\nimport helmet from \"helmet\";\n\nconst app = express();\nconst server = http.createServer(app);\n\n// Track active connections for graceful shutdown\nconst sockets = new Set<import(\"net\").Socket>();\n\nserver.on(\"connection\", (socket) => {\n  sockets.add(socket);\n  socket.on(\"close\", () => sockets.delete(socket));\n});\n\n// Middleware\napp.use(express.json());\napp.use(express.urlencoded({ extended: true }));\napp.use(cors());\napp.use(helmet());\n\n// Health check endpoint\napp.get(\"/health\", (_req, res) => {\n  res.status(200).json({ status: \"ok\", timestamp: new Date().toISOString() });\n});\n\n// TODO: Add your routes here\n// app.use(\"/api\", yourRouter);\n\n// 404 handler\napp.use((_req, res) => {\n  res.status(404).json({ success: false, message: \"Resource not found\" });\n});\n\n// Error handler\napp.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {\n  console.error(\"[ERROR]\", err.stack || err.message);\n  res.status(500).json({\n    success: false,\n    message: process.env.NODE_ENV === \"development\" ? err.message : \"Internal Server Error\",\n  });\n});\n\nconst PORT = process.env.PORT || 3000;\n\nexport const startServer = async () => {\n  if (server.listening) {\n    console.log(\"Server already running\");\n    return;\n  }\n\n  try {\n    server.listen(PORT, () => {\n      console.log(`Server running on http://localhost:${PORT}`);\n      console.log(`Health check: http://localhost:${PORT}/health`);\n    });\n  } catch (err) {\n    console.error(\"Failed to start server:\", err);\n    process.exit(1);\n  }\n};\n\nexport const shutdown = async (signal: string) => {\n  console.log(`\\n${signal} received. Shutting down gracefully...`);\n\n  server.close(() => {\n    console.log(\"HTTP server closed\");\n    process.exit(0);\n  });\n\n  // Force shutdown after 10s\n  setTimeout(() => {\n    console.warn(\n      `Grace period expired. Forcing close of ${sockets.size} remaining connection(s).`\n    );\n    sockets.forEach((socket) => socket.destroy());\n    process.exit(1);\n  }, 10000).unref();\n};\n\n// Start the server\nstartServer();\n\n// Graceful shutdown handlers\nprocess.on(\"SIGTERM\", () => shutdown(\"SIGTERM\"));\nprocess.on(\"SIGINT\", () => shutdown(\"SIGINT\"));\n\nprocess.on(\"unhandledRejection\", (reason, p) => {\n  console.error(\"Unhandled Rejection at:\", p, \"reason:\", reason);\n});\n\nprocess.on(\"uncaughtException\", (err) => {\n  console.error(\"Uncaught Exception:\", err);\n  process.exit(1);\n});"
+        },
+        {
+          "path": "src/libs/cors.ts",
+          "content": "import cors, { CorsOptions } from \"cors\";\n\n/**\n * Parses environment variables to get allowed origins, methods, and headers.\n */\nconst getEnvConfig = () => {\n  const allowedOrigins: string[] = (process.env.CORS_ORIGINS ?? \"\")\n    .split(\",\")\n    .map((o: string) => o.trim())\n    .filter((o: string) => o.length > 0);\n\n  const allowedMethods: string[] = (process.env.CORS_METHODS ?? \"\")\n    .split(\",\")\n    .map((m: string) => m.trim())\n    .filter((m: string) => m.length > 0);\n\n  const allowedHeaders: string[] = (process.env.CORS_HEADERS ?? \"\")\n    .split(\",\")\n    .map((h: string) => h.trim())\n    .filter((h: string) => h.length > 0);\n\n  return { allowedOrigins, allowedMethods, allowedHeaders };\n};\n\nexport const { allowedOrigins, allowedMethods, allowedHeaders } =\n  getEnvConfig();\n\n/**\n * Creates valid CorsOptions based on provided or environment configuration.\n */\nexport const createCorsOptions = (\n  overrides?: Partial<CorsOptions> & {\n    origins?: string[];\n    methods?: string[];\n    headers?: string[];\n  }\n): CorsOptions => {\n  const origins = overrides?.origins ?? allowedOrigins;\n  const methods = overrides?.methods ?? allowedMethods;\n  const headers = overrides?.headers ?? allowedHeaders;\n\n  return {\n    origin: (\n      origin: string | undefined,\n      callback: (error: Error | null, allow?: boolean) => void\n    ) => {\n      // Allow requests with no origin (mobile apps, curl, same-origin)\n      if (!origin) return callback(null, true);\n\n      if (origins.length === 0 || origins.includes(origin)) {\n        callback(null, true);\n      } else {\n        callback(new Error(\"Not allowed by CORS\"));\n      }\n    },\n    methods,\n    allowedHeaders: headers,\n    credentials: true,\n    ...overrides,\n  };\n};\n\n/**\n * Check if critical CORS configuration is missing.\n * Useful for validating environment setup on startup.\n */\nexport const validateCorsConfig = () => {\n  if (\n    !allowedOrigins.length ||\n    !allowedMethods.length ||\n    !allowedHeaders.length\n  ) {\n    console.warn(\n      \" CORS configuration might be incomplete. Check CORS_ORIGINS, CORS_METHODS, and CORS_HEADERS .env variables.\"\n    );\n    return false;\n  }\n  return true;\n};\n\n// Default export uses strict environment variables but doesn't hard exit only warns if missing,\n// unless strict validation is called.\nconst defaultOptions = createCorsOptions();\nexport const corsMiddleware = cors(defaultOptions);\n"
+        },
+        {
+          "path": "src/middleware/async-handler.ts",
+          "content": "import { Request, Response, NextFunction, RequestHandler } from 'express';\n\n/**\n * Type for async request handlers\n */\ntype AsyncRequestHandler = (\n  req: Request,\n  res: Response,\n  next: NextFunction\n) => Promise<unknown>;\n\n/**\n * Wraps an async route handler to automatically catch and forward errors\n * Eliminates the need for try-catch blocks in every route\n * \n * @example\n * // Instead of:\n * router.get('/users', async (req, res, next) => {\n *   try {\n *     const users = await User.findAll();\n *     res.json(users);\n *   } catch (err) {\n *     next(err);\n *   }\n * });\n * \n * // You can write:\n * router.get('/users', asyncHandler(async (req, res) => {\n *   const users = await User.findAll();\n *   res.json(users);\n * }));\n */\nexport const asyncHandler = (fn: AsyncRequestHandler): RequestHandler => {\n  return (req: Request, res: Response, next: NextFunction) => {\n    Promise.resolve(fn(req, res, next)).catch(next);\n  };\n};\n\n/**\n * Alternative syntax using higher-order function\n * Can be used as a decorator-like pattern\n * \n * @example\n * const getUsers = catchAsync(async (req, res) => {\n *   const users = await User.findAll();\n *   res.json(users);\n * });\n * \n * router.get('/users', getUsers);\n */\nexport const catchAsync = asyncHandler; // Alias for those who prefer this name\n\n/**\n * Wrap multiple handlers at once\n * \n * @example\n * const [getUser, createUser, deleteUser] = wrapHandlers(\n *   async (req, res) => { ... },\n *   async (req, res) => { ... },\n *   async (req, res) => { ... },\n * );\n */\nexport const wrapHandlers = (\n  ...handlers: AsyncRequestHandler[]\n): RequestHandler[] => {\n  return handlers.map(asyncHandler);\n};\n"
+        },
+        {
+          "path": "src/index.ts.hbs",
+          "content": "import { shutdown, startServer } from \"@/libs/server\";\n\nstartServer();\n\nprocess.on(\"SIGTERM\", () => shutdown(\"SIGTERM\"));\nprocess.on(\"SIGINT\", () => shutdown(\"SIGINT\"));\n\nprocess.on(\"unhandledRejection\", (reason, p) => {\n  console.error(\"Unhandled Rejection at:\", p, \"reason:\", reason);\n});\n\nprocess.on(\"uncaughtException\", (err) => {\n  console.error(\"Uncaught Exception:\", err);\n  process.exit(1);\n});\n"
+        },
+        {
+          "path": "tsconfig.json",
+          "content": "{\n  \"compilerOptions\": {\n    \"target\": \"ES2022\",\n    \"module\": \"NodeNext\",\n    \"moduleResolution\": \"NodeNext\",\n    \"esModuleInterop\": true,\n    \"strict\": true,\n    \"skipLibCheck\": true,\n    \"outDir\": \"dist\",\n    \"rootDir\": \"src\",\n    \"baseUrl\": \".\",\n    \"paths\": {\n      \"@/*\": [\"src/*\"]\n    }\n  },\n  \"include\": [\"src/**/*\"],\n  \"exclude\": [\"node_modules\", \"dist\"]\n}\n"
+        }
+      ]
+    },
+    {
+      "name": "express-socket",
+      "category": "base",
+      "description": "Real-time server with Socket.io integration",
+      "framework": "express",
+      "version": "5",
+      "dependencies": [
+        "express",
+        "socket.io",
+        "cors",
+        "dotenv",
+        "jsonwebtoken"
+      ],
+      "devDependencies": [
+        "typescript",
+        "@types/node",
+        "@types/express",
+        "@types/cors",
+        "tsx",
+        "@types/jsonwebtoken"
+      ],
+      "scripts": {
+        "dev": "tsx watch src/index.ts",
+        "build": "tsc",
+        "start": "node dist/index.js"
+      },
+      "envVars": [
+        "PORT=3000",
+        "NODE_ENV=development",
+        "CORS_ORIGIN=http://localhost:3000"
+      ],
+      "files": [
+        {
+          "path": "src/libs/socket-server.ts",
+          "content": "import { Server, Socket } from \"socket.io\";\nimport jwt from \"jsonwebtoken\";\nimport type { Server as HTTPServer } from \"http\";\n\ninterface JwtPayloadOptions {\n  id: string;\n  email: string;\n  name: string;\n}\n\nexport interface AuthenticatedSocket extends Socket {\n  user?: JwtPayloadOptions;\n}\n\ninterface InitSocketOptions {\n  /** The HTTP server instance to attach socket.io to */\n  server: HTTPServer;\n  /**\n   * Allowed CORS origins\n   * @default \"*\"\n   */\n  allowedOrigins?: string | string[];\n  /**\n   * Allowed HTTP methods for CORS\n   * @default [\"GET\", \"POST\"]\n   */\n  allowedMethods?: string[];\n  /** Allowed headers for CORS */\n  allowedHeaders?: string[];\n  /**\n   * Whether to validate JWT token on connection handshake\n   * @default true\n   */\n  validateToken?: boolean;\n}\n\nexport function initializeSocket({\n  server,\n  allowedOrigins = \"*\",\n  allowedMethods = [\"GET\", \"POST\"],\n  allowedHeaders,\n  validateToken = true,\n}: InitSocketOptions): Server {\n  const io = new Server(server, {\n    cors: {\n      origin: allowedOrigins,\n      methods: allowedMethods,\n      allowedHeaders,\n      credentials: true,\n    },\n  });\n\n  io.use((socket: AuthenticatedSocket, next) => {\n    console.log(\n      `[${new Date().toISOString()}] Socket connected: ${socket.id}, ` +\n        `IP: ${socket.handshake.address}, ` +\n        `Transport: ${socket.conn.transport}`\n    );\n\n    // If validation is disabled, skip auth check\n    if (!validateToken) return next();\n\n    const token = socket.handshake.query.token as string;\n    if (!token) return next(new Error(\"Authentication error\"));\n\n    try {\n      const secret: jwt.Secret = process.env.JWT_ACCESS_SECRET!;\n      const decoded = jwt.verify(token, secret) as JwtPayloadOptions;\n      socket.user = decoded;\n      next();\n    } catch (err) {\n      console.error(\"JWT verification failed:\", err);\n      next(new Error(\"Authentication error\"));\n    }\n  });\n\n  return io;\n}\n"
+        },
+        {
+          "path": "src/index.ts.hbs",
+          "content": "import { startSocketServer, shutdownSocketServer } from \"@/libs/socket-server\";\n\nstartSocketServer();\n\nprocess.on(\"SIGTERM\", () => shutdownSocketServer(\"SIGTERM\"));\nprocess.on(\"SIGINT\", () => shutdownSocketServer(\"SIGINT\"));\n\nprocess.on(\"unhandledRejection\", (reason, p) => {\n  console.error(\"Unhandled Rejection at:\", p, \"reason:\", reason);\n});\n\nprocess.on(\"uncaughtException\", (err) => {\n  console.error(\"Uncaught Exception:\", err);\n  process.exit(1);\n});\n"
+        },
+        {
+          "path": "tsconfig.json",
+          "content": "{\n  \"compilerOptions\": {\n    \"target\": \"ES2022\",\n    \"module\": \"NodeNext\",\n    \"moduleResolution\": \"NodeNext\",\n    \"esModuleInterop\": true,\n    \"strict\": true,\n    \"skipLibCheck\": true,\n    \"outDir\": \"dist\",\n    \"rootDir\": \"src\",\n    \"baseUrl\": \".\",\n    \"paths\": {\n      \"@/*\": [\"src/*\"]\n    }\n  },\n  \"include\": [\"src/**/*\"],\n  \"exclude\": [\"node_modules\", \"dist\"]\n}\n"
+        }
+      ]
+    },
+    {
+      "name": "express-trpc",
+      "category": "base",
+      "description": "tRPC server with Express adapter for end-to-end type safety",
+      "framework": "express",
+      "version": "5",
+      "dependencies": [
+        "express",
+        "@trpc/server",
+        "zod",
+        "cors",
+        "dotenv"
+      ],
+      "devDependencies": [
+        "typescript",
+        "@types/node",
+        "@types/express",
+        "@types/cors",
+        "tsx"
+      ],
+      "scripts": {
+        "dev": "tsx watch src/index.ts",
+        "build": "tsc",
+        "start": "node dist/index.js"
+      },
+      "envVars": [
+        "PORT=3000",
+        "NODE_ENV=development"
+      ],
+      "files": [
+        {
+          "path": "src/libs/trpc-server.ts",
+          "content": "import { initTRPC, TRPCError } from '@trpc/server';\nimport { createExpressMiddleware } from '@trpc/server/adapters/express';\nimport express from 'express';\nimport { z } from 'zod';\n\n/**\n * Context creation function\n * Called for each request, provides context to all procedures\n */\nconst createContext = ({ req, res }: { req: express.Request; res: express.Response }) => {\n  // Extract user from auth header if present\n  // const token = req.headers.authorization?.split(' ')[1];\n  // const user = token ? verifyToken(token) : null;\n  \n  return {\n    req,\n    res,\n    // user,\n  };\n};\n\ntype Context = Awaited<ReturnType<typeof createContext>>;\n\n/**\n * Initialize tRPC with context\n */\nconst t = initTRPC.context<Context>().create({\n  errorFormatter({ shape, error }) {\n    return {\n      ...shape,\n      data: {\n        ...shape.data,\n        // Add custom error data here\n      },\n    };\n  },\n});\n\n/**\n * Reusable middleware\n */\nconst isAuthenticated = t.middleware(({ ctx, next }) => {\n  // if (!ctx.user) {\n  //   throw new TRPCError({ code: 'UNAUTHORIZED' });\n  // }\n  return next({\n    ctx: {\n      ...ctx,\n      // user: ctx.user,\n    },\n  });\n});\n\n/**\n * Procedure builders\n */\nexport const router = t.router;\nexport const publicProcedure = t.procedure;\nexport const protectedProcedure = t.procedure.use(isAuthenticated);\n\n/**\n * Example router with procedures\n */\nconst appRouter = router({\n  // Health check\n  health: publicProcedure.query(() => ({\n    status: 'ok',\n    timestamp: new Date().toISOString(),\n  })),\n\n  // Example public procedure\n  hello: publicProcedure\n    .input(z.object({ name: z.string().optional() }))\n    .query(({ input }) => {\n      return { greeting: `Hello ${input.name || 'World'}!` };\n    }),\n\n  // Example mutation\n  createItem: publicProcedure\n    .input(z.object({\n      title: z.string().min(1).max(100),\n      description: z.string().optional(),\n    }))\n    .mutation(async ({ input }) => {\n      // Save to database\n      const item = {\n        id: Math.random().toString(36).slice(2),\n        ...input,\n        createdAt: new Date(),\n      };\n      return item;\n    }),\n\n  // Nested routers\n  user: router({\n    list: publicProcedure.query(() => {\n      return [{ id: '1', name: 'John' }];\n    }),\n    byId: publicProcedure\n      .input(z.object({ id: z.string() }))\n      .query(({ input }) => {\n        return { id: input.id, name: 'John' };\n      }),\n  }),\n});\n\n/**\n * Export type for client usage\n */\nexport type AppRouter = typeof appRouter;\n\n/**\n * Create and start tRPC server with Express\n */\nexport const createTRPCServer = (port = 4000) => {\n  const app = express();\n\n  // Health check endpoint\n  app.get('/health', (_req, res) => {\n    res.json({ status: 'ok', timestamp: new Date().toISOString() });\n  });\n\n  // tRPC middleware\n  app.use(\n    '/trpc',\n    createExpressMiddleware({\n      router: appRouter,\n      createContext,\n      onError({ error, path }) {\n        console.error(`[ERROR] tRPC error on ${path}:`, error.message);\n      },\n    })\n  );\n\n  const server = app.listen(port, () => {\n    console.log(`tRPC server running at http://localhost:${port}/trpc`);\n  });\n\n  return { app, server, router: appRouter };\n};\n\n/**\n * Start the server\n */\nif (require.main === module) {\n  createTRPCServer();\n}\n"
+        },
+        {
+          "path": "src/index.ts.hbs",
+          "content": "import { startTRPCServer, shutdownTRPCServer } from \"@/libs/trpc-server\";\n\nstartTRPCServer();\n\nprocess.on(\"SIGTERM\", () => shutdownTRPCServer(\"SIGTERM\"));\nprocess.on(\"SIGINT\", () => shutdownTRPCServer(\"SIGINT\"));\n\nprocess.on(\"unhandledRejection\", (reason, p) => {\n  console.error(\"Unhandled Rejection at:\", p, \"reason:\", reason);\n});\n\nprocess.on(\"uncaughtException\", (err) => {\n  console.error(\"Uncaught Exception:\", err);\n  process.exit(1);\n});\n"
+        },
+        {
+          "path": "tsconfig.json",
+          "content": "{\n  \"compilerOptions\": {\n    \"target\": \"ES2022\",\n    \"module\": \"NodeNext\",\n    \"moduleResolution\": \"NodeNext\",\n    \"esModuleInterop\": true,\n    \"strict\": true,\n    \"skipLibCheck\": true,\n    \"outDir\": \"dist\",\n    \"rootDir\": \"src\",\n    \"baseUrl\": \".\",\n    \"paths\": {\n      \"@/*\": [\"src/*\"]\n    }\n  },\n  \"include\": [\"src/**/*\"],\n  \"exclude\": [\"node_modules\", \"dist\"]\n}\n"
+        }
+      ]
+    }
+  ],
+  "database": [
+    {
+      "name": "drizzle-mysql",
+      "category": "database",
+      "description": "Drizzle ORM with MySQL setup",
+      "framework": "express",
+      "dependencies": [
+        "drizzle-orm",
+        "mysql2",
+        "dotenv"
+      ],
+      "devDependencies": [
+        "drizzle-kit",
+        "@types/node"
+      ],
+      "scripts": {
+        "db:generate": "drizzle-kit generate",
+        "db:push": "drizzle-kit push",
+        "db:studio": "drizzle-kit studio"
+      },
+      "envVars": [
+        "DATABASE_URL=mysql://user:password@localhost:3306/database"
+      ],
+      "files": [
+        {
+          "path": "drizzle.config.ts.hbs",
+          "content": "import { defineConfig } from \"drizzle-kit\";\n\nexport default defineConfig({\n  schema: \"./src/db/schema.ts\",\n  out: \"./drizzle\",\n  dialect: \"mysql\",\n  dbCredentials: {\n    url: process.env.DATABASE_URL!,\n  },\n});\n"
+        },
+        {
+          "path": "src/db/index.ts.hbs",
+          "content": "import { drizzle } from \"drizzle-orm/mysql2\";\nimport mysql from \"mysql2/promise\";\n\nconst pool = mysql.createPool({\n  uri: process.env.DATABASE_URL,\n  waitForConnections: true,\n  connectionLimit: 10,\n  queueLimit: 0,\n});\n\nexport const db = drizzle(pool);\n\nexport async function connectDB() {\n  try {\n    const connection = await pool.getConnection();\n    console.log(\"Database connected\");\n    connection.release();\n  } catch (error) {\n    console.error(\"Database connection failed:\", error);\n    throw error;\n  }\n}\n\nexport async function disconnectDB() {\n  await pool.end();\n  console.log(\"Database disconnected\");\n}\n"
+        },
+        {
+          "path": "src/db/schema.ts.hbs",
+          "content": "// Define your schema here\n// Example:\n// import { mysqlTable, varchar, int, timestamp } from \"drizzle-orm/mysql-core\";\n// \n// export const users = mysqlTable(\"users\", {\n//   id: int(\"id\").primaryKey().autoincrement(),\n//   email: varchar(\"email\", { length: 255 }).notNull().unique(),\n//   name: varchar(\"name\", { length: 255 }),\n//   createdAt: timestamp(\"created_at\").defaultNow(),\n// });\n"
+        }
+      ]
+    },
+    {
+      "name": "drizzle-postgres",
+      "category": "database",
+      "description": "Drizzle ORM with PostgreSQL setup",
+      "framework": "express",
+      "dependencies": [
+        "drizzle-orm",
+        "pg",
+        "dotenv"
+      ],
+      "devDependencies": [
+        "drizzle-kit",
+        "@types/pg"
+      ],
+      "scripts": {
+        "db:generate": "drizzle-kit generate",
+        "db:push": "drizzle-kit push",
+        "db:studio": "drizzle-kit studio"
+      },
+      "envVars": [
+        "DATABASE_URL"
+      ],
+      "files": [
+        {
+          "path": "drizzle.config.ts.hbs",
+          "content": "import \"dotenv/config\";\nimport { defineConfig } from \"drizzle-kit\";\n\nexport default defineConfig({\n  schema: \"./src/db/schema.ts\",\n  out: \"./drizzle\",\n  dialect: \"postgresql\",\n  dbCredentials: {\n    url: process.env.DATABASE_URL!,\n  },\n});\n"
+        },
+        {
+          "path": "src/db/index.ts.hbs",
+          "content": "import \"dotenv/config\";\nimport { drizzle } from \"drizzle-orm/node-postgres\";\nimport { Pool } from \"pg\";\nimport * as schema from \"./schema\";\n\nconst pool = new Pool({\n  connectionString: process.env.DATABASE_URL,\n});\n\nexport const db = drizzle(pool, { schema });\n\nexport type Database = typeof db;\n"
+        },
+        {
+          "path": "src/db/schema.ts.hbs",
+          "content": "import { pgTable, serial, text, timestamp, varchar } from \"drizzle-orm/pg-core\";\n\n// Example users table - modify as needed\nexport const users = pgTable(\"users\", {\n  id: serial(\"id\").primaryKey(),\n  email: varchar(\"email\", { length: 255 }).notNull().unique(),\n  name: text(\"name\"),\n  createdAt: timestamp(\"created_at\").defaultNow().notNull(),\n  updatedAt: timestamp(\"updated_at\").defaultNow().notNull(),\n});\n\nexport type User = typeof users.$inferSelect;\nexport type NewUser = typeof users.$inferInsert;\n"
+        }
+      ]
+    },
+    {
+      "name": "drizzle-sqlite",
+      "category": "database",
+      "description": "Drizzle ORM with SQLite (better-sqlite3) setup",
+      "framework": "express",
+      "dependencies": [
+        "drizzle-orm",
+        "better-sqlite3",
+        "dotenv"
+      ],
+      "devDependencies": [
+        "drizzle-kit",
+        "@types/better-sqlite3"
+      ],
+      "scripts": {
+        "db:generate": "drizzle-kit generate",
+        "db:push": "drizzle-kit push",
+        "db:studio": "drizzle-kit studio"
+      },
+      "envVars": [
+        "DATABASE_PATH=./data/database.db"
+      ],
+      "files": [
+        {
+          "path": "drizzle.config.ts.hbs",
+          "content": "import { defineConfig } from \"drizzle-kit\";\n\nexport default defineConfig({\n  schema: \"./src/db/schema.ts\",\n  out: \"./drizzle\",\n  dialect: \"sqlite\",\n  dbCredentials: {\n    url: process.env.DATABASE_PATH || \"./data/database.db\",\n  },\n});\n"
+        },
+        {
+          "path": "src/db/index.ts.hbs",
+          "content": "import { drizzle } from \"drizzle-orm/better-sqlite3\";\nimport Database from \"better-sqlite3\";\nimport path from \"path\";\nimport fs from \"fs\";\n\nconst dbPath = process.env.DATABASE_PATH || \"./data/database.db\";\n\n// Ensure directory exists\nconst dir = path.dirname(dbPath);\nif (!fs.existsSync(dir)) {\n  fs.mkdirSync(dir, { recursive: true });\n}\n\nconst sqlite = new Database(dbPath);\nsqlite.pragma(\"journal_mode = WAL\");\n\nexport const db = drizzle(sqlite);\n\nexport function closeDB() {\n  sqlite.close();\n  console.log(\"Database closed\");\n}\n"
+        },
+        {
+          "path": "src/db/schema.ts.hbs",
+          "content": "// Define your schema here\n// Example:\n// import { sqliteTable, text, integer } from \"drizzle-orm/sqlite-core\";\n// \n// export const users = sqliteTable(\"users\", {\n//   id: integer(\"id\").primaryKey({ autoIncrement: true }),\n//   email: text(\"email\").notNull().unique(),\n//   name: text(\"name\"),\n//   createdAt: integer(\"created_at\", { mode: \"timestamp\" }).defaultNow(),\n// });\n"
+        }
+      ]
+    },
+    {
+      "name": "mongodb",
+      "category": "database",
+      "description": "MongoDB native driver setup",
+      "framework": "express",
+      "dependencies": [
+        "mongodb",
+        "dotenv"
+      ],
+      "devDependencies": [],
+      "envVars": [
+        "MONGODB_URI=mongodb://localhost:27017/database"
+      ],
+      "files": [
+        {
+          "path": "src/libs/db/storage.ts",
+          "content": "import { MongoClient, Db, Collection, ObjectId, Filter, UpdateFilter, Document, WithId } from 'mongodb';\n\n/**\n * Generic Storage class for MongoDB (native driver)\n * Handles ObjectId conversion and provides cursor-based pagination\n */\n\nconst client = new MongoClient(process.env.MONGODB_URI || 'mongodb://localhost:27017');\nexport const db: Db = client.db(process.env.MONGODB_DB || 'app');\n\nexport async function connectMongo(): Promise<void> {\n  await client.connect();\n  console.log('[MONGO] Connected');\n}\n\nexport interface PaginationOptions<T> {\n  page?: number;\n  limit?: number;\n  cursor?: string;\n  cursorField?: keyof T;\n  orderBy?: keyof T;\n  orderDir?: 1 | -1;\n  filter?: Filter<T>;\n}\n\nexport interface PaginatedResult<T> {\n  data: T[];\n  pagination: {\n    total: number;\n    page: number;\n    limit: number;\n    totalPages: number;\n    hasNext: boolean;\n    hasPrev: boolean;\n    nextCursor?: string;\n  };\n}\n\nexport class MongoStorage<T extends Document> {\n  private collection: Collection<T>;\n\n  constructor(db: Db, collectionName: string) {\n    this.collection = db.collection<T>(collectionName);\n  }\n\n  private toObjectId(id: string | ObjectId): ObjectId {\n    return typeof id === 'string' ? new ObjectId(id) : id;\n  }\n\n  async create(data: Omit<T, '_id'>): Promise<WithId<T>> {\n    const doc = { ...data, createdAt: new Date(), updatedAt: new Date() } as any;\n    const result = await this.collection.insertOne(doc);\n    return { ...doc, _id: result.insertedId } as WithId<T>;\n  }\n\n  async findAll(filter: Filter<T> = {}): Promise<WithId<T>[]> {\n    return this.collection.find(filter).toArray();\n  }\n\n  async findById(id: string | ObjectId): Promise<WithId<T> | null> {\n    return this.collection.findOne({ _id: this.toObjectId(id) } as Filter<T>);\n  }\n\n  async findOne(filter: Filter<T>): Promise<WithId<T> | null> {\n    return this.collection.findOne(filter);\n  }\n\n  async update(id: string | ObjectId, data: Partial<T>): Promise<WithId<T> | null> {\n    const update: UpdateFilter<T> = { $set: { ...data, updatedAt: new Date() } as any };\n    await this.collection.updateOne({ _id: this.toObjectId(id) } as Filter<T>, update);\n    return this.findById(id);\n  }\n\n  async delete(id: string | ObjectId): Promise<boolean> {\n    const result = await this.collection.deleteOne({ _id: this.toObjectId(id) } as Filter<T>);\n    return result.deletedCount > 0;\n  }\n\n  async softDelete(id: string | ObjectId): Promise<WithId<T> | null> {\n    const update: UpdateFilter<T> = { $set: { deletedAt: new Date() } as any };\n    await this.collection.updateOne({ _id: this.toObjectId(id) } as Filter<T>, update);\n    return this.findById(id);\n  }\n\n  async restore(id: string | ObjectId): Promise<WithId<T> | null> {\n    const update: UpdateFilter<T> = { $unset: { deletedAt: '' } as any };\n    await this.collection.updateOne({ _id: this.toObjectId(id) } as Filter<T>, update);\n    return this.findById(id);\n  }\n\n  async bulkCreate(data: Omit<T, '_id'>[]): Promise<WithId<T>[]> {\n    if (!data.length) return [];\n    const now = new Date();\n    const docs = data.map(d => ({ ...d, createdAt: now, updatedAt: now })) as any[];\n    const result = await this.collection.insertMany(docs);\n    return docs.map((doc, i) => ({ ...doc, _id: result.insertedIds[i] })) as WithId<T>[];\n  }\n\n  async bulkUpdate(ids: (string | ObjectId)[], data: Partial<T>): Promise<number> {\n    if (!ids.length) return 0;\n    const objectIds = ids.map(id => this.toObjectId(id));\n    const update: UpdateFilter<T> = { $set: { ...data, updatedAt: new Date() } as any };\n    const result = await this.collection.updateMany({ _id: { $in: objectIds } } as Filter<T>, update);\n    return result.modifiedCount;\n  }\n\n  async bulkDelete(ids: (string | ObjectId)[]): Promise<number> {\n    if (!ids.length) return 0;\n    const objectIds = ids.map(id => this.toObjectId(id));\n    const result = await this.collection.deleteMany({ _id: { $in: objectIds } } as Filter<T>);\n    return result.deletedCount;\n  }\n\n  async paginate(opts: PaginationOptions<T> = {}): Promise<PaginatedResult<WithId<T>>> {\n    const { page = 1, limit = 10, cursor, cursorField = '_id' as keyof T, orderBy = '_id' as keyof T, orderDir = -1, filter = {} } = opts;\n\n    const total = await this.collection.countDocuments(filter);\n    \n    let query: Filter<T> = { ...filter };\n    if (cursor) {\n      const cursorOp = orderDir === 1 ? '$gt' : '$lt';\n      const cursorVal = cursorField === '_id' ? new ObjectId(cursor) : cursor;\n      query = { ...query, [cursorField]: { [cursorOp]: cursorVal } } as Filter<T>;\n    }\n\n    const skip = cursor ? 0 : (page - 1) * limit;\n    const data = await this.collection\n      .find(query)\n      .sort({ [orderBy]: orderDir } as any)\n      .skip(skip)\n      .limit(limit)\n      .toArray();\n\n    const totalPages = Math.ceil(total / limit);\n    const lastDoc = data[data.length - 1];\n    const nextCursor = lastDoc ? String((lastDoc as any)[cursorField]) : undefined;\n\n    return {\n      data,\n      pagination: { total, page, limit, totalPages, hasNext: data.length === limit, hasPrev: page > 1, nextCursor }\n    };\n  }\n\n  async count(filter: Filter<T> = {}): Promise<number> {\n    return this.collection.countDocuments(filter);\n  }\n\n  async exists(filter: Filter<T>): Promise<boolean> {\n    const count = await this.collection.countDocuments(filter, { limit: 1 });\n    return count > 0;\n  }\n\n  async aggregate<R = Document>(pipeline: Document[]): Promise<R[]> {\n    return this.collection.aggregate<R>(pipeline).toArray();\n  }\n}\n"
+        },
+        {
+          "path": "src/db/index.ts.hbs",
+          "content": "import { MongoClient, Db } from \"mongodb\";\n\nconst uri = process.env.MONGODB_URI || \"mongodb://localhost:27017/database\";\nconst client = new MongoClient(uri);\n\nlet db: Db;\n\nexport async function connectDB(): Promise<Db> {\n  if (db) return db;\n  \n  await client.connect();\n  db = client.db();\n  console.log(\"MongoDB connected\");\n  return db;\n}\n\nexport async function disconnectDB(): Promise<void> {\n  await client.close();\n  console.log(\"MongoDB disconnected\");\n}\n\nexport function getDB(): Db {\n  if (!db) {\n    throw new Error(\"Database not connected. Call connectDB() first.\");\n  }\n  return db;\n}\n"
+        }
+      ]
+    },
+    {
+      "name": "prisma-postgres",
+      "category": "database",
+      "description": "Prisma ORM with PostgreSQL setup",
+      "framework": "express",
+      "dependencies": [
+        "@prisma/client",
+        "dotenv"
+      ],
+      "devDependencies": [
+        "prisma",
+        "@types/node"
+      ],
+      "scripts": {
+        "db:generate": "prisma generate",
+        "db:push": "prisma db push",
+        "db:studio": "prisma studio",
+        "db:migrate": "prisma migrate dev"
+      },
+      "envVars": [
+        "DATABASE_URL=postgresql://user:password@localhost:5432/database"
+      ],
+      "files": [
+        {
+          "path": "src/libs/db/prisma.ts",
+          "content": "import { PrismaClient } from '@prisma/client';\n\n/**\n * Prisma client configuration\n * Logs queries in development, only errors in production\n */\nconst prismaClientSingleton = () => {\n  return new PrismaClient({\n    log:\n      process.env.NODE_ENV === 'development'\n        ? ['query', 'info', 'warn', 'error']\n        : ['error'],\n    errorFormat: 'pretty',\n  });\n};\n\n// Prevent multiple instances in development (hot reloading)\ndeclare global {\n  var prisma: undefined | ReturnType<typeof prismaClientSingleton>;\n}\n\nexport const prisma = globalThis.prisma ?? prismaClientSingleton();\n\nif (process.env.NODE_ENV !== 'production') {\n  globalThis.prisma = prisma;\n}\n\n/**\n * Connect to database with retry logic\n */\nexport const connectDatabase = async (retries = 5, delay = 5000) => {\n  for (let i = 0; i < retries; i++) {\n    try {\n      await prisma.$connect();\n      console.log('[OK] Database connected');\n      return;\n    } catch (error) {\n      console.error(`[ERROR] Database connection failed (attempt ${i + 1}/${retries})`);\n      if (i < retries - 1) {\n        await new Promise((r) => setTimeout(r, delay));\n      }\n    }\n  }\n  throw new Error('Failed to connect to database after retries');\n};\n\n/**\n * Disconnect from database (for graceful shutdown)\n */\nexport const disconnectDatabase = async () => {\n  await prisma.$disconnect();\n  console.log('[INFO] Database disconnected');\n};\n\n/**\n * Health check for database connection\n */\nexport const isDatabaseHealthy = async (): Promise<boolean> => {\n  try {\n    await prisma.$queryRaw`SELECT 1`;\n    return true;\n  } catch {\n    return false;\n  }\n};\n"
+        },
+        {
+          "path": "prisma/schema.prisma",
+          "content": "generator client {\n  provider = \"prisma-client-js\"\n}\n\ndatasource db {\n  provider = \"postgresql\"\n  url      = env(\"DATABASE_URL\")\n}\n\n// Example model - uncomment and modify as needed\n// model User {\n//   id        String   @id @default(cuid())\n//   email     String   @unique\n//   name      String?\n//   createdAt DateTime @default(now())\n//   updatedAt DateTime @updatedAt\n// }\n"
+        }
+      ]
+    }
+  ],
+  "auth": [
+    {
+      "name": "better-auth",
+      "category": "auth",
+      "description": "better-auth setup with session management",
+      "framework": "express",
+      "dependencies": [
+        "better-auth"
+      ],
+      "devDependencies": [],
+      "envVars": [
+        "BETTER_AUTH_SECRET",
+        "BETTER_AUTH_URL"
+      ],
+      "files": [
+        {
+          "path": "src/auth/index.ts.hbs",
+          "content": "import { betterAuth } from \"better-auth\";\nimport { db } from \"../db\";\n\nexport const auth = betterAuth({\n  database: db,\n  emailAndPassword: {\n    enabled: true,\n  },\n  session: {\n    expiresIn: 60 * 60 * 24 * 7,\n    updateAge: 60 * 60 * 24,\n  },\n});\n\nexport type Session = typeof auth.$Infer.Session;\nexport type User = typeof auth.$Infer.User;\n"
+        },
+        {
+          "path": "src/auth/routes.ts.hbs",
+          "content": "import { Router } from \"express\";\nimport { toNodeHandler } from \"better-auth/node\";\nimport { auth } from \"./index\";\n\nconst router = Router();\nrouter.all(\"/api/auth/*\", toNodeHandler(auth));\n\nexport default router;\n"
+        }
+      ]
+    },
+    {
+      "name": "jwt-auth",
+      "category": "auth",
+      "description": "Custom JWT authentication with refresh tokens",
+      "framework": "express",
+      "dependencies": [
+        "jsonwebtoken"
+      ],
+      "devDependencies": [
+        "@types/jsonwebtoken",
+        "@types/express"
+      ],
+      "envVars": [
+        "JWT_SECRET=your-secret-key-change-in-production",
+        "JWT_EXPIRES_IN=15m",
+        "JWT_REFRESH_EXPIRES_IN=7d"
+      ],
+      "files": [
+        {
+          "path": "src/middleware/auth.ts",
+          "content": "import { Request, Response, NextFunction } from 'express';\nimport jwt from 'jsonwebtoken';\n\nconst JWT_SECRET = process.env.JWT_SECRET || 'changeme-in-production';\n\n/**\n * Extended Request interface with user payload\n */\nexport interface AuthenticatedRequest extends Request {\n  user?: JwtPayload;\n}\n\nexport interface JwtPayload {\n  id: string;\n  email: string;\n  role?: string;\n  [key: string]: unknown;\n}\n\n/**\n * Extract JWT token from Authorization header\n * Supports: \"Bearer <token>\" format\n */\nconst extractToken = (req: Request): string | null => {\n  const authHeader = req.headers.authorization;\n  \n  if (!authHeader) return null;\n  \n  // Support \"Bearer <token>\" format\n  if (authHeader.startsWith('Bearer ')) {\n    return authHeader.slice(7);\n  }\n  \n  return authHeader;\n};\n\n/**\n * JWT Authentication Middleware\n * Verifies token and attaches decoded payload to req.user\n */\nexport const authenticate = (\n  req: AuthenticatedRequest,\n  res: Response,\n  next: NextFunction\n) => {\n  const token = extractToken(req);\n\n  if (!token) {\n    return res.status(401).json({\n      success: false,\n      message: 'Access denied. No token provided.',\n    });\n  }\n\n  try {\n    const decoded = jwt.verify(token, JWT_SECRET) as JwtPayload;\n    req.user = decoded;\n    next();\n  } catch (error) {\n    if (error instanceof jwt.TokenExpiredError) {\n      return res.status(401).json({\n        success: false,\n        message: 'Token has expired.',\n      });\n    }\n    if (error instanceof jwt.JsonWebTokenError) {\n      return res.status(401).json({\n        success: false,\n        message: 'Invalid token.',\n      });\n    }\n    return res.status(500).json({\n      success: false,\n      message: 'Failed to authenticate token.',\n    });\n  }\n};\n\n/**\n * Optional authentication - doesn't fail if no token provided\n * Useful for routes that behave differently for logged-in users\n */\nexport const optionalAuth = (\n  req: AuthenticatedRequest,\n  res: Response,\n  next: NextFunction\n) => {\n  const token = extractToken(req);\n\n  if (!token) {\n    return next();\n  }\n\n  try {\n    const decoded = jwt.verify(token, JWT_SECRET) as JwtPayload;\n    req.user = decoded;\n  } catch {\n    // Token invalid, but that's okay for optional auth\n  }\n  \n  next();\n};\n\n/**\n * Role-based authorization middleware\n * Use after authenticate middleware\n * @param allowedRoles - Array of roles that can access the route\n */\nexport const authorize = (...allowedRoles: string[]) => {\n  return (req: AuthenticatedRequest, res: Response, next: NextFunction) => {\n    if (!req.user) {\n      return res.status(401).json({\n        success: false,\n        message: 'Authentication required.',\n      });\n    }\n\n    if (!req.user.role || !allowedRoles.includes(req.user.role)) {\n      return res.status(403).json({\n        success: false,\n        message: 'Insufficient permissions.',\n      });\n    }\n\n    next();\n  };\n};\n"
+        }
+      ]
+    },
+    {
+      "name": "passport-local",
+      "category": "auth",
+      "description": "Passport.js with local username/password strategy",
+      "framework": "express",
+      "dependencies": [
+        "passport",
+        "passport-local",
+        "express-session"
+      ],
+      "devDependencies": [
+        "@types/passport",
+        "@types/passport-local",
+        "@types/express-session"
+      ],
+      "envVars": [
+        "SESSION_SECRET=your-session-secret-change-in-production"
+      ],
+      "files": [
+        {
+          "path": "src/auth/passport.ts.hbs",
+          "content": "import passport from \"passport\";\nimport { Strategy as LocalStrategy } from \"passport-local\";\n\n// Configure the local strategy\n// Replace with your actual user lookup logic\npassport.use(\n  new LocalStrategy(\n    {\n      usernameField: \"email\",\n      passwordField: \"password\",\n    },\n    async (email, password, done) => {\n      try {\n        // TODO: Replace with your user lookup\n        // const user = await findUserByEmail(email);\n        // if (!user) {\n        //   return done(null, false, { message: \"Incorrect email.\" });\n        // }\n        // const isValid = await verifyPassword(password, user.password);\n        // if (!isValid) {\n        //   return done(null, false, { message: \"Incorrect password.\" });\n        // }\n        // return done(null, user);\n        \n        return done(null, false, { message: \"Not implemented\" });\n      } catch (error) {\n        return done(error);\n      }\n    }\n  )\n);\n\n// Serialize user for session\npassport.serializeUser((user: any, done) => {\n  done(null, user.id);\n});\n\n// Deserialize user from session\npassport.deserializeUser(async (id: string, done) => {\n  try {\n    // TODO: Replace with your user lookup\n    // const user = await findUserById(id);\n    // done(null, user);\n    done(null, null);\n  } catch (error) {\n    done(error, null);\n  }\n});\n\nexport default passport;\n"
+        }
+      ]
+    }
+  ],
+  "features": [
+    {
+      "name": "cache-redis",
+      "category": "features",
+      "description": "Redis caching layer with ioredis",
+      "framework": "express",
+      "dependencies": [
+        "ioredis"
+      ],
+      "devDependencies": [
+        "@types/ioredis"
+      ],
+      "envVars": [
+        "REDIS_URL=redis://localhost:6379"
+      ],
+      "files": [
+        {
+          "path": "src/libs/cache.ts",
+          "content": "import Redis from 'ioredis';\n\n/**\n * Redis client configuration\n */\nconst redisConfig = {\n  host: process.env.REDIS_HOST || 'localhost',\n  port: parseInt(process.env.REDIS_PORT || '6379', 10),\n  password: process.env.REDIS_PASSWORD || undefined,\n  db: parseInt(process.env.REDIS_DB || '0', 10),\n  retryStrategy: (times: number) => {\n    if (times > 10) {\n      console.error('[ERROR] Redis: Max retries reached');\n      return null; // Stop retrying\n    }\n    return Math.min(times * 100, 3000); // Exponential backoff, max 3s\n  },\n  maxRetriesPerRequest: 3,\n};\n\n/**\n * Redis client instance\n */\nexport const redis = new Redis(redisConfig);\n\n// Connection event handlers\nredis.on('connect', () => {\n  console.log('[OK] Redis connected');\n});\n\nredis.on('error', (err) => {\n  console.error('[ERROR] Redis error:', err.message);\n});\n\nredis.on('close', () => {\n  console.log('[INFO] Redis connection closed');\n});\n\n/**\n * Disconnect from Redis (for graceful shutdown)\n */\nexport const disconnectRedis = async () => {\n  await redis.quit();\n};\n\n/**\n * Health check for Redis connection\n */\nexport const isRedisHealthy = async (): Promise<boolean> => {\n  try {\n    const pong = await redis.ping();\n    return pong === 'PONG';\n  } catch {\n    return false;\n  }\n};\n\n/**\n * Cache helpers with JSON serialization\n */\nexport const cache = {\n  /**\n   * Get cached value\n   */\n  async get<T>(key: string): Promise<T | null> {\n    const value = await redis.get(key);\n    if (!value) return null;\n    try {\n      return JSON.parse(value) as T;\n    } catch {\n      return value as T;\n    }\n  },\n\n  /**\n   * Set cached value with optional TTL\n   * @param key Cache key\n   * @param value Value to cache\n   * @param ttlSeconds Time to live in seconds (optional)\n   */\n  async set(key: string, value: unknown, ttlSeconds?: number): Promise<void> {\n    const serialized = typeof value === 'string' ? value : JSON.stringify(value);\n    if (ttlSeconds) {\n      await redis.setex(key, ttlSeconds, serialized);\n    } else {\n      await redis.set(key, serialized);\n    }\n  },\n\n  /**\n   * Delete cached value\n   */\n  async del(key: string): Promise<void> {\n    await redis.del(key);\n  },\n\n  /**\n   * Check if key exists\n   */\n  async exists(key: string): Promise<boolean> {\n    return (await redis.exists(key)) === 1;\n  },\n\n  /**\n   * Get remaining TTL in seconds\n   */\n  async ttl(key: string): Promise<number> {\n    return redis.ttl(key);\n  },\n};\n"
+        }
+      ],
+      "featureType": "cache"
+    },
+    {
+      "name": "logging-winston",
+      "category": "features",
+      "description": "Winston logging with Morgan HTTP request logging",
+      "framework": "express",
+      "dependencies": [
+        "winston",
+        "morgan"
+      ],
+      "devDependencies": [
+        "@types/morgan",
+        "@types/node"
+      ],
+      "envVars": [
+        "LOG_LEVEL=info"
+      ],
+      "files": [
+        {
+          "path": "src/libs/logger.ts",
+          "content": "\nimport winston from \"winston\";\nimport morgan from \"morgan\";\n\nconst levels = {\n  error: 0,\n  warn: 1,\n  info: 2,\n  http: 3,\n  debug: 4,\n};\n\nconst level = () => {\n  const env = process.env.NODE_ENV || \"development\";\n  const isDevelopment = env === \"development\";\n  return isDevelopment ? \"debug\" : \"warn\";\n};\n\nconst colors = {\n  error: \"red\",\n  warn: \"yellow\",\n  info: \"green\",\n  http: \"magenta\",\n  debug: \"white\",\n};\n\nwinston.addColors(colors);\n\nconst format = winston.format.combine(\n  winston.format.timestamp({ format: \"YYYY-MM-DD HH:mm:ss:ms\" }),\n  winston.format.colorize({ all: true }),\n  winston.format.printf(\n    (info) => `${info.timestamp} ${info.level}: ${info.message}`\n  )\n);\n\nconst transports = [\n  new winston.transports.Console(),\n  // Add File transport if needed for production\n  // new winston.transports.File({\n  //   filename: 'logs/error.log',\n  //   level: 'error',\n  // }),\n  // new winston.transports.File({ filename: 'logs/all.log' }),\n];\n\nexport const logger = winston.createLogger({\n  level: level(),\n  levels,\n  format,\n  transports,\n});\n\nexport const apiLogger = morgan(\n  \":method :url :status :res[content-length] - :response-time ms\",\n  {\n    stream: {\n      write: (message) => logger.http(message.trim()),\n    },\n  }\n);\n\n"
+        }
+      ],
+      "featureType": "logging"
+    },
+    {
+      "name": "mailer-ses",
+      "category": "features",
+      "description": "Email sending with AWS SES",
+      "framework": "express",
+      "dependencies": [
+        "@aws-sdk/client-ses"
+      ],
+      "devDependencies": [],
+      "envVars": [
+        "AWS_REGION=us-east-1",
+        "AWS_ACCESS_KEY_ID=",
+        "AWS_SECRET_ACCESS_KEY=",
+        "MAIL_FROM=noreply@example.com"
+      ],
+      "files": [
+        {
+          "path": "src/libs/mailer.ts",
+          "content": "import {\n  SESClient,\n  SendEmailCommand,\n  SendRawEmailCommand,\n  SendBulkTemplatedEmailCommand,\n} from '@aws-sdk/client-ses';\n\n/**\n * SES client configuration\n */\nconst sesClient = new SESClient({\n  region: process.env.AWS_REGION || 'us-east-1',\n  credentials: process.env.AWS_ACCESS_KEY_ID\n    ? {\n        accessKeyId: process.env.AWS_ACCESS_KEY_ID,\n        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || '',\n      }\n    : undefined, // Use IAM role if no credentials\n});\n\nconst FROM_EMAIL = process.env.SES_FROM_EMAIL || 'noreply@example.com';\n\n/**\n * Email options interface\n */\ninterface SendEmailOptions {\n  to: string | string[];\n  subject: string;\n  text?: string;\n  html?: string;\n  from?: string;\n  replyTo?: string[];\n  cc?: string[];\n  bcc?: string[];\n}\n\n/**\n * Send an email using AWS SES\n */\nexport const sendMail = async (options: SendEmailOptions) => {\n  const toAddresses = Array.isArray(options.to) ? options.to : [options.to];\n\n  const command = new SendEmailCommand({\n    Source: options.from || FROM_EMAIL,\n    Destination: {\n      ToAddresses: toAddresses,\n      CcAddresses: options.cc,\n      BccAddresses: options.bcc,\n    },\n    Message: {\n      Subject: {\n        Data: options.subject,\n        Charset: 'UTF-8',\n      },\n      Body: {\n        ...(options.text && {\n          Text: {\n            Data: options.text,\n            Charset: 'UTF-8',\n          },\n        }),\n        ...(options.html && {\n          Html: {\n            Data: options.html,\n            Charset: 'UTF-8',\n          },\n        }),\n      },\n    },\n    ReplyToAddresses: options.replyTo,\n  });\n\n  try {\n    const response = await sesClient.send(command);\n    console.log(`[EMAIL] Email sent: ${response.MessageId}`);\n    return response;\n  } catch (error) {\n    console.error('[ERROR] SES error:', error);\n    throw error;\n  }\n};\n\n/**\n * Send using SES template\n * Requires a pre-configured SES template\n */\nexport const sendWithTemplate = async (\n  to: string | string[],\n  templateName: string,\n  templateData: Record<string, unknown>,\n  options?: Partial<SendEmailOptions>\n) => {\n  const { SendTemplatedEmailCommand } = await import('@aws-sdk/client-ses');\n\n  const command = new SendTemplatedEmailCommand({\n    Source: options?.from || FROM_EMAIL,\n    Destination: {\n      ToAddresses: Array.isArray(to) ? to : [to],\n    },\n    Template: templateName,\n    TemplateData: JSON.stringify(templateData),\n    ReplyToAddresses: options?.replyTo,\n  });\n\n  try {\n    const response = await sesClient.send(command);\n    console.log(`[EMAIL] Template email sent: ${response.MessageId}`);\n    return response;\n  } catch (error) {\n    console.error('[ERROR] SES template error:', error);\n    throw error;\n  }\n};\n\n/**\n * Send bulk emails (up to 50 destinations per request)\n */\nexport const sendBulkEmails = async (\n  emails: Array<{\n    to: string;\n    templateData: Record<string, unknown>;\n  }>,\n  templateName: string,\n  from?: string\n) => {\n  const command = new SendBulkTemplatedEmailCommand({\n    Source: from || FROM_EMAIL,\n    Template: templateName,\n    DefaultTemplateData: JSON.stringify({}),\n    Destinations: emails.map((email) => ({\n      Destination: {\n        ToAddresses: [email.to],\n      },\n      ReplacementTemplateData: JSON.stringify(email.templateData),\n    })),\n  });\n\n  try {\n    const response = await sesClient.send(command);\n    console.log(`[EMAIL] Bulk sent: ${emails.length} emails`);\n    return response;\n  } catch (error) {\n    console.error('[ERROR] SES bulk error:', error);\n    throw error;\n  }\n};\n\n/**\n * Common email templates\n */\nexport const templates = {\n  passwordReset: (resetUrl: string, expiresIn = '1 hour') => ({\n    subject: 'Reset Your Password',\n    html: `\n      <div style=\"font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;\">\n        <h2>Password Reset Request</h2>\n        <p>You requested to reset your password. Click the button below to proceed:</p>\n        <a href=\"${resetUrl}\" style=\"display: inline-block; padding: 12px 24px; background: #007bff; color: white; text-decoration: none; border-radius: 4px;\">\n          Reset Password\n        </a>\n        <p style=\"margin-top: 20px; color: #666;\">\n          This link expires in ${expiresIn}. If you didn't request this, please ignore this email.\n        </p>\n      </div>\n    `,\n  }),\n\n  welcome: (name: string, loginUrl: string) => ({\n    subject: 'Welcome!',\n    html: `\n      <div style=\"font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;\">\n        <h2>Welcome, ${name}!</h2>\n        <p>Thanks for signing up. We're excited to have you on board.</p>\n        <a href=\"${loginUrl}\" style=\"display: inline-block; padding: 12px 24px; background: #28a745; color: white; text-decoration: none; border-radius: 4px;\">\n          Get Started\n        </a>\n      </div>\n    `,\n  }),\n\n  verifyEmail: (verifyUrl: string) => ({\n    subject: 'Verify Your Email',\n    html: `\n      <div style=\"font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;\">\n        <h2>Verify Your Email</h2>\n        <p>Please verify your email address by clicking the button below:</p>\n        <a href=\"${verifyUrl}\" style=\"display: inline-block; padding: 12px 24px; background: #007bff; color: white; text-decoration: none; border-radius: 4px;\">\n          Verify Email\n        </a>\n      </div>\n    `,\n  }),\n};\n"
+        }
+      ],
+      "featureType": "mailer"
+    },
+    {
+      "name": "mailer-nodemailer",
+      "category": "features",
+      "description": "Email sending with Nodemailer (SMTP)",
+      "framework": "express",
+      "dependencies": [
+        "nodemailer"
+      ],
+      "devDependencies": [
+        "@types/nodemailer"
+      ],
+      "envVars": [
+        "SMTP_HOST=smtp.example.com",
+        "SMTP_PORT=587",
+        "SMTP_USER=",
+        "SMTP_PASS=",
+        "MAIL_FROM=noreply@example.com"
+      ],
+      "files": [
+        {
+          "path": "src/libs/mailer.ts",
+          "content": "import nodemailer, { Transporter } from 'nodemailer';\n\n/**\n * Email configuration from environment variables\n */\nconst config = {\n  host: process.env.SMTP_HOST || 'smtp.gmail.com',\n  port: parseInt(process.env.SMTP_PORT || '587', 10),\n  secure: process.env.SMTP_SECURE === 'true',\n  auth: {\n    user: process.env.SMTP_USER,\n    pass: process.env.SMTP_PASS,\n  },\n  from: process.env.SMTP_FROM || 'noreply@example.com',\n};\n\n/**\n * Nodemailer transporter instance\n */\nlet transporter: Transporter | null = null;\n\n/**\n * Initialize mail transporter\n */\nexport const initMailer = () => {\n  if (!config.auth.user || !config.auth.pass) {\n    console.warn('[WARN] SMTP credentials not configured, email disabled');\n    return;\n  }\n\n  transporter = nodemailer.createTransport({\n    host: config.host,\n    port: config.port,\n    secure: config.secure,\n    auth: config.auth,\n  });\n\n  console.log('[OK] Mailer initialized');\n};\n\n/**\n * Verify SMTP connection\n */\nexport const verifyMailer = async (): Promise<boolean> => {\n  if (!transporter) return false;\n  \n  try {\n    await transporter.verify();\n    return true;\n  } catch (error) {\n    console.error('[ERROR] SMTP verification failed:', error);\n    return false;\n  }\n};\n\n/**\n * Email options interface\n */\ninterface SendMailOptions {\n  to: string | string[];\n  subject: string;\n  text?: string;\n  html?: string;\n  from?: string;\n  replyTo?: string;\n  attachments?: Array<{\n    filename: string;\n    content?: string | Buffer;\n    path?: string;\n  }>;\n}\n\n/**\n * Send an email\n */\nexport const sendMail = async (options: SendMailOptions) => {\n  if (!transporter) {\n    throw new Error('Mailer not initialized. Call initMailer() first.');\n  }\n\n  const mailOptions = {\n    from: options.from || config.from,\n    to: Array.isArray(options.to) ? options.to.join(', ') : options.to,\n    subject: options.subject,\n    text: options.text,\n    html: options.html,\n    replyTo: options.replyTo,\n    attachments: options.attachments,\n  };\n\n  try {\n    const info = await transporter.sendMail(mailOptions);\n    console.log(`[EMAIL] Email sent: ${info.messageId}`);\n    return info;\n  } catch (error) {\n    console.error('[ERROR] Failed to send email:', error);\n    throw error;\n  }\n};\n\n/**\n * Common email templates\n */\nexport const templates = {\n  /**\n   * Password reset email\n   */\n  passwordReset: (resetUrl: string, expiresIn = '1 hour') => ({\n    subject: 'Reset Your Password',\n    html: `\n      <div style=\"font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;\">\n        <h2>Password Reset Request</h2>\n        <p>You requested to reset your password. Click the button below to proceed:</p>\n        <a href=\"${resetUrl}\" style=\"display: inline-block; padding: 12px 24px; background: #007bff; color: white; text-decoration: none; border-radius: 4px;\">\n          Reset Password\n        </a>\n        <p style=\"margin-top: 20px; color: #666;\">\n          This link expires in ${expiresIn}. If you didn't request this, please ignore this email.\n        </p>\n      </div>\n    `,\n    text: `Reset your password: ${resetUrl}\\n\\nThis link expires in ${expiresIn}.`,\n  }),\n\n  /**\n   * Welcome email\n   */\n  welcome: (name: string, loginUrl: string) => ({\n    subject: 'Welcome!',\n    html: `\n      <div style=\"font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;\">\n        <h2>Welcome, ${name}!</h2>\n        <p>Thanks for signing up. We're excited to have you on board.</p>\n        <a href=\"${loginUrl}\" style=\"display: inline-block; padding: 12px 24px; background: #28a745; color: white; text-decoration: none; border-radius: 4px;\">\n          Get Started\n        </a>\n      </div>\n    `,\n    text: `Welcome, ${name}!\\n\\nGet started: ${loginUrl}`,\n  }),\n\n  /**\n   * Email verification\n   */\n  verifyEmail: (verifyUrl: string) => ({\n    subject: 'Verify Your Email',\n    html: `\n      <div style=\"font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;\">\n        <h2>Verify Your Email</h2>\n        <p>Please verify your email address by clicking the button below:</p>\n        <a href=\"${verifyUrl}\" style=\"display: inline-block; padding: 12px 24px; background: #007bff; color: white; text-decoration: none; border-radius: 4px;\">\n          Verify Email\n        </a>\n      </div>\n    `,\n    text: `Verify your email: ${verifyUrl}`,\n  }),\n};\n"
+        }
+      ],
+      "featureType": "mailer"
+    },
+    {
+      "name": "mailer-resend",
+      "category": "features",
+      "description": "Modern email API with Resend",
+      "framework": "express",
+      "dependencies": [
+        "resend"
+      ],
+      "devDependencies": [],
+      "envVars": [
+        "RESEND_API_KEY=",
+        "MAIL_FROM=noreply@example.com"
+      ],
+      "files": [
+        {
+          "path": "src/libs/mailer.ts",
+          "content": "import { Resend } from 'resend';\n\n/**\n * Resend client configuration\n */\nconst resend = new Resend(process.env.RESEND_API_KEY);\n\nconst FROM_EMAIL = process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev';\n\n/**\n * Email options interface\n */\ninterface SendEmailOptions {\n  to: string | string[];\n  subject: string;\n  text?: string;\n  html?: string;\n  from?: string;\n  replyTo?: string;\n  cc?: string | string[];\n  bcc?: string | string[];\n  attachments?: Array<{\n    filename: string;\n    content: Buffer | string;\n  }>;\n}\n\n/**\n * Send an email using Resend\n */\nexport const sendMail = async (options: SendEmailOptions) => {\n  if (!process.env.RESEND_API_KEY) {\n    throw new Error('RESEND_API_KEY environment variable is not set');\n  }\n\n  try {\n    const { data, error } = await resend.emails.send({\n      from: options.from || FROM_EMAIL,\n      to: Array.isArray(options.to) ? options.to : [options.to],\n      subject: options.subject,\n      text: options.text,\n      html: options.html,\n      reply_to: options.replyTo,\n      cc: options.cc ? (Array.isArray(options.cc) ? options.cc : [options.cc]) : undefined,\n      bcc: options.bcc ? (Array.isArray(options.bcc) ? options.bcc : [options.bcc]) : undefined,\n      attachments: options.attachments,\n    });\n\n    if (error) {\n      console.error('[ERROR] Resend error:', error);\n      throw new Error(error.message);\n    }\n\n    console.log(`[EMAIL] Email sent: ${data?.id}`);\n    return data;\n  } catch (error) {\n    console.error('[ERROR] Failed to send email:', error);\n    throw error;\n  }\n};\n\n/**\n * Send batch emails (up to 100 emails per request)\n */\nexport const sendBatchEmails = async (\n  emails: Array<Omit<SendEmailOptions, 'from'> & { from?: string }>\n) => {\n  const batch = emails.map((email) => ({\n    from: email.from || FROM_EMAIL,\n    to: Array.isArray(email.to) ? email.to : [email.to],\n    subject: email.subject,\n    text: email.text,\n    html: email.html,\n  }));\n\n  const { data, error } = await resend.batch.send(batch);\n\n  if (error) {\n    console.error('[ERROR] Batch send error:', error);\n    throw new Error(error.message);\n  }\n\n  return data;\n};\n\n/**\n * Common email templates\n */\nexport const templates = {\n  passwordReset: (resetUrl: string, expiresIn = '1 hour') => ({\n    subject: 'Reset Your Password',\n    html: `\n      <div style=\"font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;\">\n        <h2>Password Reset Request</h2>\n        <p>You requested to reset your password. Click the button below to proceed:</p>\n        <a href=\"${resetUrl}\" style=\"display: inline-block; padding: 12px 24px; background: #007bff; color: white; text-decoration: none; border-radius: 4px;\">\n          Reset Password\n        </a>\n        <p style=\"margin-top: 20px; color: #666;\">\n          This link expires in ${expiresIn}. If you didn't request this, please ignore this email.\n        </p>\n      </div>\n    `,\n  }),\n\n  welcome: (name: string, loginUrl: string) => ({\n    subject: 'Welcome!',\n    html: `\n      <div style=\"font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;\">\n        <h2>Welcome, ${name}!</h2>\n        <p>Thanks for signing up. We're excited to have you on board.</p>\n        <a href=\"${loginUrl}\" style=\"display: inline-block; padding: 12px 24px; background: #28a745; color: white; text-decoration: none; border-radius: 4px;\">\n          Get Started\n        </a>\n      </div>\n    `,\n  }),\n\n  verifyEmail: (verifyUrl: string) => ({\n    subject: 'Verify Your Email',\n    html: `\n      <div style=\"font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;\">\n        <h2>Verify Your Email</h2>\n        <p>Please verify your email address by clicking the button below:</p>\n        <a href=\"${verifyUrl}\" style=\"display: inline-block; padding: 12px 24px; background: #007bff; color: white; text-decoration: none; border-radius: 4px;\">\n          Verify Email\n        </a>\n      </div>\n    `,\n  }),\n};\n"
+        }
+      ],
+      "featureType": "mailer"
+    },
+    {
+      "name": "mailer-sendgrid",
+      "category": "features",
+      "description": "Email sending with SendGrid API",
+      "framework": "express",
+      "dependencies": [
+        "@sendgrid/mail"
+      ],
+      "devDependencies": [],
+      "envVars": [
+        "SENDGRID_API_KEY=",
+        "MAIL_FROM=noreply@example.com"
+      ],
+      "files": [
+        {
+          "path": "src/libs/mailer.ts",
+          "content": "import sgMail from '@sendgrid/mail';\n\n/**\n * Initialize SendGrid with API key\n */\nif (process.env.SENDGRID_API_KEY) {\n  sgMail.setApiKey(process.env.SENDGRID_API_KEY);\n}\n\nconst FROM_EMAIL = process.env.SENDGRID_FROM_EMAIL || 'noreply@example.com';\n\n/**\n * Email options interface\n */\ninterface SendEmailOptions {\n  to: string | string[];\n  subject: string;\n  text?: string;\n  html?: string;\n  from?: string;\n  replyTo?: string;\n  cc?: string | string[];\n  bcc?: string | string[];\n  attachments?: Array<{\n    filename: string;\n    content: string; // Base64 encoded\n    type?: string;\n    disposition?: 'attachment' | 'inline';\n  }>;\n  templateId?: string;\n  dynamicTemplateData?: Record<string, unknown>;\n}\n\n/**\n * Send an email using SendGrid\n */\nexport const sendMail = async (options: SendEmailOptions) => {\n  if (!process.env.SENDGRID_API_KEY) {\n    throw new Error('SENDGRID_API_KEY environment variable is not set');\n  }\n\n  try {\n    const msg: sgMail.MailDataRequired = {\n      to: options.to,\n      from: options.from || FROM_EMAIL,\n      subject: options.subject,\n      text: options.text,\n      html: options.html,\n      replyTo: options.replyTo,\n      cc: options.cc,\n      bcc: options.bcc,\n      attachments: options.attachments,\n      templateId: options.templateId,\n      dynamicTemplateData: options.dynamicTemplateData,\n    };\n\n    const [response] = await sgMail.send(msg);\n    console.log(`[EMAIL] Email sent: ${response.headers['x-message-id']}`);\n    return response;\n  } catch (error: any) {\n    console.error('[ERROR] SendGrid error:', error.response?.body || error.message);\n    throw error;\n  }\n};\n\n/**\n * Send batch emails (up to 1000 recipients per request)\n */\nexport const sendBatchEmails = async (\n  emails: Array<Omit<SendEmailOptions, 'from'> & { from?: string }>\n) => {\n  const messages = emails.map((email) => ({\n    to: email.to,\n    from: email.from || FROM_EMAIL,\n    subject: email.subject,\n    text: email.text,\n    html: email.html,\n    templateId: email.templateId,\n    dynamicTemplateData: email.dynamicTemplateData,\n  }));\n\n  try {\n    const responses = await sgMail.send(messages);\n    console.log(`[EMAIL] Batch sent: ${messages.length} emails`);\n    return responses;\n  } catch (error: any) {\n    console.error('[ERROR] Batch send error:', error.response?.body || error.message);\n    throw error;\n  }\n};\n\n/**\n * Send using SendGrid dynamic template\n */\nexport const sendWithTemplate = async (\n  to: string | string[],\n  templateId: string,\n  dynamicData: Record<string, unknown>,\n  options?: Partial<SendEmailOptions>\n) => {\n  return sendMail({\n    to,\n    subject: '', // Subject comes from template\n    templateId,\n    dynamicTemplateData: dynamicData,\n    ...options,\n  });\n};\n\n/**\n * Common email templates (for inline HTML, not SendGrid templates)\n */\nexport const templates = {\n  passwordReset: (resetUrl: string, expiresIn = '1 hour') => ({\n    subject: 'Reset Your Password',\n    html: `\n      <div style=\"font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;\">\n        <h2>Password Reset Request</h2>\n        <p>You requested to reset your password. Click the button below to proceed:</p>\n        <a href=\"${resetUrl}\" style=\"display: inline-block; padding: 12px 24px; background: #007bff; color: white; text-decoration: none; border-radius: 4px;\">\n          Reset Password\n        </a>\n        <p style=\"margin-top: 20px; color: #666;\">\n          This link expires in ${expiresIn}. If you didn't request this, please ignore this email.\n        </p>\n      </div>\n    `,\n  }),\n\n  welcome: (name: string, loginUrl: string) => ({\n    subject: 'Welcome!',\n    html: `\n      <div style=\"font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;\">\n        <h2>Welcome, ${name}!</h2>\n        <p>Thanks for signing up. We're excited to have you on board.</p>\n        <a href=\"${loginUrl}\" style=\"display: inline-block; padding: 12px 24px; background: #28a745; color: white; text-decoration: none; border-radius: 4px;\">\n          Get Started\n        </a>\n      </div>\n    `,\n  }),\n\n  verifyEmail: (verifyUrl: string) => ({\n    subject: 'Verify Your Email',\n    html: `\n      <div style=\"font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;\">\n        <h2>Verify Your Email</h2>\n        <p>Please verify your email address by clicking the button below:</p>\n        <a href=\"${verifyUrl}\" style=\"display: inline-block; padding: 12px 24px; background: #007bff; color: white; text-decoration: none; border-radius: 4px;\">\n          Verify Email\n        </a>\n      </div>\n    `,\n  }),\n};\n"
+        }
+      ],
+      "featureType": "mailer"
+    },
+    {
+      "name": "monitoring-sentry",
+      "category": "features",
+      "description": "Sentry error tracking and performance monitoring",
+      "framework": "express",
+      "dependencies": [
+        "@sentry/node"
+      ],
+      "devDependencies": [
+        "@types/express"
+      ],
+      "envVars": [
+        "SENTRY_DSN=",
+        "NODE_ENV=development"
+      ],
+      "files": [
+        {
+          "path": "src/libs/sentry.ts",
+          "content": "import * as Sentry from '@sentry/node';\nimport { Express, Request, Response, NextFunction } from 'express';\n\n/**\n * Initialize Sentry\n * Call this before creating your Express app\n */\nexport const initSentry = () => {\n  if (!process.env.SENTRY_DSN) {\n    console.warn('[WARN] SENTRY_DSN not set, error tracking disabled');\n    return;\n  }\n\n  Sentry.init({\n    dsn: process.env.SENTRY_DSN,\n    environment: process.env.NODE_ENV || 'development',\n    release: process.env.npm_package_version,\n    \n    // Performance Monitoring\n    tracesSampleRate: process.env.NODE_ENV === 'production' ? 0.1 : 1.0,\n    \n    // Only send errors in production\n    enabled: process.env.NODE_ENV === 'production',\n    \n    // Filter sensitive data\n    beforeSend(event) {\n      // Remove sensitive headers\n      if (event.request?.headers) {\n        delete event.request.headers['authorization'];\n        delete event.request.headers['cookie'];\n        delete event.request.headers['x-api-key'];\n      }\n      return event;\n    },\n  });\n\n  console.log('[OK] Sentry initialized');\n};\n\n/**\n * Setup Sentry request handler\n * Add this BEFORE your routes\n */\nexport const sentryRequestHandler = () => {\n  return Sentry.Handlers.requestHandler({\n    // Include user info if available\n    user: ['id', 'email'],\n  });\n};\n\n/**\n * Setup Sentry tracing handler\n * Add this BEFORE your routes, after requestHandler\n */\nexport const sentryTracingHandler = () => {\n  return Sentry.Handlers.tracingHandler();\n};\n\n/**\n * Setup Sentry error handler\n * Add this AFTER your routes, before your error handler\n */\nexport const sentryErrorHandler = () => {\n  return Sentry.Handlers.errorHandler({\n    shouldHandleError(error) {\n      // Capture 4xx and 5xx errors\n      const status = (error as any).status || (error as any).statusCode || 500;\n      return status >= 400;\n    },\n  });\n};\n\n/**\n * Capture exception manually\n */\nexport const captureException = (error: Error, context?: Record<string, unknown>) => {\n  Sentry.captureException(error, {\n    extra: context,\n  });\n};\n\n/**\n * Set user context for error tracking\n * Call this after user authentication\n */\nexport const setUser = (user: { id: string; email?: string; [key: string]: unknown }) => {\n  Sentry.setUser(user);\n};\n\n/**\n * Clear user context (on logout)\n */\nexport const clearUser = () => {\n  Sentry.setUser(null);\n};\n\n/**\n * Add breadcrumb for debugging\n */\nexport const addBreadcrumb = (message: string, category?: string, data?: Record<string, unknown>) => {\n  Sentry.addBreadcrumb({\n    message,\n    category: category || 'custom',\n    data,\n    level: 'info',\n  });\n};\n\n/**\n * Example usage in app.ts:\n * \n * import { initSentry, sentryRequestHandler, sentryTracingHandler, sentryErrorHandler } from './libs/sentry';\n * \n * // Initialize before app\n * initSentry();\n * \n * const app = express();\n * \n * // Add handlers in order\n * app.use(sentryRequestHandler());\n * app.use(sentryTracingHandler());\n * \n * // Your routes here\n * app.use('/api', routes);\n * \n * // Error handler (must be after routes)\n * app.use(sentryErrorHandler());\n * app.use(errorHandler);\n */\n"
+        }
+      ],
+      "featureType": "monitoring"
+    },
+    {
+      "name": "upload-cloudinary",
+      "category": "features",
+      "description": "Cloudinary file uploads with transformations",
+      "framework": "express",
+      "dependencies": [
+        "cloudinary"
+      ],
+      "devDependencies": [],
+      "envVars": [
+        "CLOUDINARY_CLOUD_NAME=",
+        "CLOUDINARY_API_KEY=",
+        "CLOUDINARY_API_SECRET="
+      ],
+      "files": [
+        {
+          "path": "src/libs/upload.ts",
+          "content": "import { v2 as cloudinary, UploadApiOptions, UploadApiResponse } from 'cloudinary';\n\n/**\n * Cloudinary configuration\n */\ncloudinary.config({\n  cloud_name: process.env.CLOUDINARY_CLOUD_NAME || '',\n  api_key: process.env.CLOUDINARY_API_KEY || '',\n  api_secret: process.env.CLOUDINARY_API_SECRET || '',\n  secure: true,\n});\n\n/**\n * Generate signed upload parameters for direct browser upload\n * Uses Cloudinary's signature-based authentication\n * \n * @example\n * // Server: Generate signed params\n * const params = getSignedUploadParams({ folder: 'avatars', maxFileSize: 5 * 1024 * 1024 });\n * \n * // Client: Upload using fetch with FormData\n * const formData = new FormData();\n * formData.append('file', file);\n * formData.append('api_key', params.apiKey);\n * formData.append('timestamp', params.timestamp.toString());\n * formData.append('signature', params.signature);\n * formData.append('folder', params.folder);\n * await fetch(params.uploadUrl, { method: 'POST', body: formData });\n */\nexport const getSignedUploadParams = (\n  options: {\n    folder?: string;\n    resourceType?: 'image' | 'video' | 'raw' | 'auto';\n    allowedFormats?: string[]; // e.g., ['jpg', 'png', 'webp']\n    maxFileSize?: number; // bytes\n    transformation?: string; // e.g., 'w_500,h_500,c_limit'\n    eager?: string; // Eager transformations\n    tags?: string[];\n    context?: Record<string, string>;\n  } = {}\n): {\n  uploadUrl: string;\n  apiKey: string;\n  timestamp: number;\n  signature: string;\n  folder: string;\n  cloudName: string;\n} => {\n  const {\n    folder = 'uploads',\n    resourceType = 'auto',\n    allowedFormats,\n    transformation,\n    eager,\n    tags,\n    context,\n  } = options;\n\n  const timestamp = Math.round(Date.now() / 1000);\n\n  // Build params object for signature\n  const params: Record<string, string | number> = {\n    timestamp,\n    folder,\n  };\n\n  if (allowedFormats) params.allowed_formats = allowedFormats.join(',');\n  if (transformation) params.transformation = transformation;\n  if (eager) params.eager = eager;\n  if (tags) params.tags = tags.join(',');\n  if (context) params.context = Object.entries(context).map(([k, v]) => `${k}=${v}`).join('|');\n\n  const signature = cloudinary.utils.api_sign_request(\n    params,\n    process.env.CLOUDINARY_API_SECRET || ''\n  );\n\n  return {\n    uploadUrl: `https://api.cloudinary.com/v1_1/${process.env.CLOUDINARY_CLOUD_NAME}/${resourceType}/upload`,\n    apiKey: process.env.CLOUDINARY_API_KEY || '',\n    timestamp,\n    signature,\n    folder,\n    cloudName: process.env.CLOUDINARY_CLOUD_NAME || '',\n  };\n};\n\n/**\n * Generate a signed upload URL (unsigned uploads must be enabled in Cloudinary settings)\n * For direct URL-based uploads without form data\n */\nexport const getSignedUploadUrl = (\n  options: {\n    folder?: string;\n    publicId?: string;\n    resourceType?: 'image' | 'video' | 'raw' | 'auto';\n    expiresAt?: number; // Unix timestamp\n  } = {}\n): string => {\n  const { folder = 'uploads', publicId, resourceType = 'auto', expiresAt } = options;\n\n  const timestamp = Math.round(Date.now() / 1000);\n  const expires = expiresAt || timestamp + 3600; // 1 hour default\n\n  const params: Record<string, string | number> = {\n    timestamp,\n    folder,\n  };\n\n  if (publicId) params.public_id = publicId;\n\n  const signature = cloudinary.utils.api_sign_request(\n    { ...params, expires_at: expires },\n    process.env.CLOUDINARY_API_SECRET || ''\n  );\n\n  const queryParams = new URLSearchParams({\n    api_key: process.env.CLOUDINARY_API_KEY || '',\n    timestamp: timestamp.toString(),\n    signature,\n    folder,\n    ...(publicId && { public_id: publicId }),\n  });\n\n  return `https://api.cloudinary.com/v1_1/${process.env.CLOUDINARY_CLOUD_NAME}/${resourceType}/upload?${queryParams}`;\n};\n\n/**\n * Upload a file from a URL (server-side)\n */\nexport const uploadFromUrl = async (\n  url: string,\n  options: UploadApiOptions = {}\n): Promise<UploadApiResponse> => {\n  return cloudinary.uploader.upload(url, {\n    folder: 'uploads',\n    resource_type: 'auto',\n    ...options,\n  });\n};\n\n/**\n * Upload a buffer (server-side)\n */\nexport const uploadBuffer = async (\n  buffer: Buffer,\n  options: UploadApiOptions = {}\n): Promise<UploadApiResponse> => {\n  return new Promise((resolve, reject) => {\n    const uploadStream = cloudinary.uploader.upload_stream(\n      {\n        folder: 'uploads',\n        resource_type: 'auto',\n        ...options,\n      },\n      (error, result) => {\n        if (error) reject(error);\n        else if (result) resolve(result);\n        else reject(new Error('Upload failed'));\n      }\n    );\n\n    uploadStream.end(buffer);\n  });\n};\n\n/**\n * Delete a file by public_id\n */\nexport const deleteFile = async (\n  publicId: string,\n  resourceType: 'image' | 'video' | 'raw' = 'image'\n): Promise<{ result: string }> => {\n  return cloudinary.uploader.destroy(publicId, { resource_type: resourceType });\n};\n\n/**\n * Generate a transformation URL\n * \n * @example\n * getTransformUrl('folder/image123', { width: 300, height: 300, crop: 'fill' })\n * // Returns: https://res.cloudinary.com/cloud/image/upload/w_300,h_300,c_fill/folder/image123\n */\nexport const getTransformUrl = (\n  publicId: string,\n  transformations: {\n    width?: number;\n    height?: number;\n    crop?: 'fill' | 'fit' | 'scale' | 'thumb' | 'crop' | 'limit';\n    quality?: number | 'auto';\n    format?: 'auto' | 'webp' | 'jpg' | 'png' | 'avif';\n    blur?: number;\n    grayscale?: boolean;\n  }\n): string => {\n  const { width, height, crop, quality, format, blur, grayscale } = transformations;\n\n  return cloudinary.url(publicId, {\n    transformation: [\n      {\n        ...(width && { width }),\n        ...(height && { height }),\n        ...(crop && { crop }),\n        ...(quality && { quality }),\n        ...(format && { fetch_format: format }),\n        ...(blur && { effect: `blur:${blur}` }),\n        ...(grayscale && { effect: 'grayscale' }),\n      },\n    ],\n  });\n};\n\n/**\n * Get optimized delivery URL with automatic format and quality\n */\nexport const getOptimizedUrl = (publicId: string, options: { width?: number; height?: number } = {}): string => {\n  return cloudinary.url(publicId, {\n    transformation: [\n      {\n        fetch_format: 'auto',\n        quality: 'auto',\n        ...(options.width && { width: options.width }),\n        ...(options.height && { height: options.height }),\n      },\n    ],\n  });\n};\n"
+        }
+      ],
+      "featureType": "upload"
+    },
+    {
+      "name": "upload-gcp",
+      "category": "features",
+      "description": "Google Cloud Storage uploads with signed URLs",
+      "framework": "express",
+      "dependencies": [
+        "@google-cloud/storage"
+      ],
+      "devDependencies": [],
+      "envVars": [
+        "GCP_PROJECT_ID=",
+        "GCS_BUCKET_NAME=",
+        "GOOGLE_APPLICATION_CREDENTIALS="
+      ],
+      "files": [
+        {
+          "path": "src/libs/upload.ts",
+          "content": "import { Storage, GetSignedUrlConfig } from '@google-cloud/storage';\n\n/**\n * GCS client configuration\n * \n * Authentication options:\n * 1. Set GOOGLE_APPLICATION_CREDENTIALS env var to path of service account JSON\n * 2. Pass keyFilename in Storage constructor\n * 3. Use default credentials (GCE, Cloud Run, etc.)\n */\nconst storage = new Storage({\n  projectId: process.env.GCP_PROJECT_ID,\n  // keyFilename: process.env.GCP_KEY_FILE, // Optional: path to service account JSON\n});\n\nconst BUCKET_NAME = process.env.GCS_BUCKET || '';\nconst bucket = storage.bucket(BUCKET_NAME);\n\n/**\n * Generate a unique file path with date-based organization\n */\nconst generatePath = (filename: string, folder = 'uploads'): string => {\n  const ext = filename.split('.').pop() || '';\n  const uniqueId = Date.now().toString(36) + Math.random().toString(36).slice(2, 10);\n  const date = new Date().toISOString().split('T')[0];\n  return `${folder}/${date}/${uniqueId}.${ext}`;\n};\n\n/**\n * Generate a signed URL for direct PUT upload\n * Uses V4 signing (recommended)\n * \n * @example\n * // Server: Generate URL\n * const { uploadUrl, path } = await getSignedUploadUrl('image.png', 'image/png');\n * \n * // Client: Upload file\n * await fetch(uploadUrl, { method: 'PUT', body: file, headers: { 'Content-Type': 'image/png' } });\n */\nexport const getSignedUploadUrl = async (\n  filename: string,\n  contentType: string,\n  options: {\n    expiresIn?: number; // minutes, default: 15\n    folder?: string;\n  } = {}\n): Promise<{ uploadUrl: string; path: string; publicUrl: string }> => {\n  const { expiresIn = 15, folder = 'uploads' } = options;\n  const path = generatePath(filename, folder);\n  const file = bucket.file(path);\n\n  const config: GetSignedUrlConfig = {\n    version: 'v4',\n    action: 'write',\n    expires: Date.now() + expiresIn * 60 * 1000,\n    contentType,\n  };\n\n  const [uploadUrl] = await file.getSignedUrl(config);\n  const publicUrl = `https://storage.googleapis.com/${BUCKET_NAME}/${path}`;\n\n  return { uploadUrl, path, publicUrl };\n};\n\n/**\n * Generate a resumable upload URL for large files\n * Supports chunked uploads and resume on failure\n * \n * @example\n * // Server: Generate resumable URL\n * const { uploadUrl, path } = await getResumableUploadUrl('video.mp4', 'video/mp4');\n * \n * // Client: Use resumable upload protocol\n * // First PUT to uploadUrl with Content-Length: 0 to get session URI\n * // Then PUT chunks to the session URI\n */\nexport const getResumableUploadUrl = async (\n  filename: string,\n  contentType: string,\n  options: {\n    folder?: string;\n    metadata?: Record<string, string>;\n  } = {}\n): Promise<{ uploadUrl: string; path: string; publicUrl: string }> => {\n  const { folder = 'uploads', metadata = {} } = options;\n  const path = generatePath(filename, folder);\n  const file = bucket.file(path);\n\n  const [uploadUrl] = await file.createResumableUpload({\n    metadata: {\n      contentType,\n      metadata,\n    },\n  });\n\n  const publicUrl = `https://storage.googleapis.com/${BUCKET_NAME}/${path}`;\n\n  return { uploadUrl, path, publicUrl };\n};\n\n/**\n * Generate a signed download URL for private files\n */\nexport const getSignedDownloadUrl = async (\n  path: string,\n  expiresIn = 60 // minutes\n): Promise<string> => {\n  const file = bucket.file(path);\n\n  const config: GetSignedUrlConfig = {\n    version: 'v4',\n    action: 'read',\n    expires: Date.now() + expiresIn * 60 * 1000,\n  };\n\n  const [url] = await file.getSignedUrl(config);\n  return url;\n};\n\n/**\n * Delete a file from GCS\n */\nexport const deleteFile = async (path: string): Promise<void> => {\n  await bucket.file(path).delete();\n};\n\n/**\n * Check if a file exists\n */\nexport const fileExists = async (path: string): Promise<boolean> => {\n  const [exists] = await bucket.file(path).exists();\n  return exists;\n};\n\n/**\n * Get file metadata\n */\nexport const getFileMetadata = async (path: string) => {\n  const [metadata] = await bucket.file(path).getMetadata();\n\n  return {\n    contentType: metadata.contentType,\n    size: metadata.size,\n    updated: metadata.updated,\n    md5Hash: metadata.md5Hash,\n    crc32c: metadata.crc32c,\n  };\n};\n\n/**\n * Upload a file buffer directly (server-side upload)\n */\nexport const uploadFile = async (\n  buffer: Buffer,\n  filename: string,\n  contentType: string,\n  folder = 'uploads'\n): Promise<{ path: string; url: string }> => {\n  const path = generatePath(filename, folder);\n  const file = bucket.file(path);\n\n  await file.save(buffer, {\n    contentType,\n    resumable: false,\n  });\n\n  const url = `https://storage.googleapis.com/${BUCKET_NAME}/${path}`;\n  return { path, url };\n};\n\n/**\n * Make a file publicly accessible\n */\nexport const makePublic = async (path: string): Promise<string> => {\n  await bucket.file(path).makePublic();\n  return `https://storage.googleapis.com/${BUCKET_NAME}/${path}`;\n};\n"
+        }
+      ],
+      "featureType": "upload"
+    },
+    {
+      "name": "upload-local",
+      "category": "features",
+      "description": "Local file uploads with Multer",
+      "framework": "express",
+      "dependencies": [
+        "multer"
+      ],
+      "devDependencies": [
+        "@types/multer"
+      ],
+      "envVars": [
+        "UPLOAD_DIR=uploads"
+      ],
+      "files": [
+        {
+          "path": "src/libs/upload.ts",
+          "content": "import multer from 'multer';\nimport path from 'path';\n\n// Configure storage\nconst storage = multer.diskStorage({\n  destination: (req, file, cb) => {\n    cb(null, 'uploads/'); // Ensure this directory exists\n  },\n  filename: (req, file, cb) => {\n    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);\n    cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));\n  },\n});\n\n// File filter (optional)\nconst fileFilter = (req: any, file: Express.Multer.File, cb: multer.FileFilterCallback) => {\n  if (file.mimetype.startsWith('image/')) {\n    cb(null, true);\n  } else {\n    cb(new Error('Only image files are allowed!'));\n  }\n};\n\nexport const upload = multer({ \n  storage: storage,\n  fileFilter: fileFilter,\n  limits: {\n    fileSize: 5 * 1024 * 1024, // 5MB limit\n  }\n});\n"
+        }
+      ],
+      "featureType": "upload"
+    },
+    {
+      "name": "upload-r2",
+      "category": "features",
+      "description": "Cloudflare R2 uploads (S3-compatible)",
+      "framework": "express",
+      "dependencies": [
+        "@aws-sdk/client-s3",
+        "@aws-sdk/s3-request-presigner"
+      ],
+      "devDependencies": [],
+      "envVars": [
+        "R2_ACCOUNT_ID=",
+        "R2_ACCESS_KEY_ID=",
+        "R2_SECRET_ACCESS_KEY=",
+        "R2_BUCKET_NAME="
+      ],
+      "files": [
+        {
+          "path": "src/libs/upload.ts",
+          "content": "import {\n  S3Client,\n  PutObjectCommand,\n  GetObjectCommand,\n  DeleteObjectCommand,\n  HeadObjectCommand,\n} from '@aws-sdk/client-s3';\nimport { getSignedUrl } from '@aws-sdk/s3-request-presigner';\nimport { randomBytes } from 'crypto';\n\n/**\n * Cloudflare R2 client configuration\n * R2 uses S3-compatible API\n * \n * Required env vars:\n * - R2_ACCOUNT_ID: Cloudflare account ID\n * - R2_ACCESS_KEY_ID: R2 access key\n * - R2_SECRET_ACCESS_KEY: R2 secret key\n * - R2_BUCKET: Bucket name\n * - R2_PUBLIC_URL: (Optional) Custom domain or R2.dev URL for public access\n */\nconst r2Client = new S3Client({\n  region: 'auto', // R2 uses 'auto' region\n  endpoint: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,\n  credentials: {\n    accessKeyId: process.env.R2_ACCESS_KEY_ID || '',\n    secretAccessKey: process.env.R2_SECRET_ACCESS_KEY || '',\n  },\n});\n\nconst BUCKET = process.env.R2_BUCKET || '';\nconst PUBLIC_URL = process.env.R2_PUBLIC_URL || ''; // e.g., https://files.example.com\n\n/**\n * Generate a unique file key with date-based organization\n */\nconst generateKey = (filename: string, folder = 'uploads'): string => {\n  const ext = filename.split('.').pop() || '';\n  const uniqueId = randomBytes(8).toString('hex');\n  const date = new Date().toISOString().split('T')[0];\n  return `${folder}/${date}/${uniqueId}.${ext}`;\n};\n\n/**\n * Generate a presigned PUT URL for direct upload\n * \n * @example\n * // Server: Generate URL\n * const { uploadUrl, key } = await getPresignedUploadUrl('image.png', 'image/png');\n * \n * // Client: Upload file\n * await fetch(uploadUrl, { method: 'PUT', body: file, headers: { 'Content-Type': 'image/png' } });\n */\nexport const getPresignedUploadUrl = async (\n  filename: string,\n  contentType: string,\n  options: {\n    expiresIn?: number; // seconds, default: 5 minutes\n    folder?: string;\n  } = {}\n): Promise<{ uploadUrl: string; key: string; publicUrl: string }> => {\n  const { expiresIn = 300, folder = 'uploads' } = options;\n  const key = generateKey(filename, folder);\n\n  const command = new PutObjectCommand({\n    Bucket: BUCKET,\n    Key: key,\n    ContentType: contentType,\n  });\n\n  const uploadUrl = await getSignedUrl(r2Client, command, { expiresIn });\n  const publicUrl = PUBLIC_URL ? `${PUBLIC_URL}/${key}` : '';\n\n  return { uploadUrl, key, publicUrl };\n};\n\n/**\n * Generate a presigned POST policy for form-based uploads\n * Allows setting conditions like max file size\n */\nexport const getPresignedPostPolicy = async (\n  filename: string,\n  contentTypePrefix: string,\n  options: {\n    expiresIn?: number; // seconds, default: 5 minutes\n    folder?: string;\n    maxSize?: number; // bytes, default: 10MB\n  } = {}\n): Promise<{\n  url: string;\n  fields: Record<string, string>;\n  key: string;\n  publicUrl: string;\n}> => {\n  const { createPresignedPost } = await import('@aws-sdk/s3-presigned-post');\n  const { expiresIn = 300, folder = 'uploads', maxSize = 10 * 1024 * 1024 } = options;\n  const key = generateKey(filename, folder);\n\n  const { url, fields } = await createPresignedPost(r2Client, {\n    Bucket: BUCKET,\n    Key: key,\n    Conditions: [\n      ['content-length-range', 0, maxSize],\n      ['starts-with', '$Content-Type', contentTypePrefix],\n    ],\n    Expires: expiresIn,\n  });\n\n  const publicUrl = PUBLIC_URL ? `${PUBLIC_URL}/${key}` : '';\n\n  return { url, fields, key, publicUrl };\n};\n\n/**\n * Generate a presigned download URL\n */\nexport const getPresignedDownloadUrl = async (\n  key: string,\n  expiresIn = 3600 // 1 hour default\n): Promise<string> => {\n  const command = new GetObjectCommand({\n    Bucket: BUCKET,\n    Key: key,\n  });\n\n  return getSignedUrl(r2Client, command, { expiresIn });\n};\n\n/**\n * Delete a file from R2\n */\nexport const deleteFile = async (key: string): Promise<void> => {\n  await r2Client.send(\n    new DeleteObjectCommand({\n      Bucket: BUCKET,\n      Key: key,\n    })\n  );\n};\n\n/**\n * Check if a file exists\n */\nexport const fileExists = async (key: string): Promise<boolean> => {\n  try {\n    await r2Client.send(\n      new HeadObjectCommand({\n        Bucket: BUCKET,\n        Key: key,\n      })\n    );\n    return true;\n  } catch {\n    return false;\n  }\n};\n\n/**\n * Get file metadata\n */\nexport const getFileMetadata = async (key: string) => {\n  const response = await r2Client.send(\n    new HeadObjectCommand({\n      Bucket: BUCKET,\n      Key: key,\n    })\n  );\n\n  return {\n    contentType: response.ContentType,\n    contentLength: response.ContentLength,\n    lastModified: response.LastModified,\n    etag: response.ETag,\n  };\n};\n\n/**\n * Upload a file buffer directly (server-side upload)\n */\nexport const uploadFile = async (\n  buffer: Buffer,\n  filename: string,\n  contentType: string,\n  folder = 'uploads'\n): Promise<{ key: string; url: string }> => {\n  const key = generateKey(filename, folder);\n\n  await r2Client.send(\n    new PutObjectCommand({\n      Bucket: BUCKET,\n      Key: key,\n      Body: buffer,\n      ContentType: contentType,\n    })\n  );\n\n  const url = PUBLIC_URL ? `${PUBLIC_URL}/${key}` : key;\n  return { key, url };\n};\n"
+        }
+      ],
+      "featureType": "upload"
+    },
+    {
+      "name": "upload-s3",
+      "category": "features",
+      "description": "AWS S3 file uploads with presigned URLs",
+      "framework": "express",
+      "dependencies": [
+        "@aws-sdk/client-s3",
+        "@aws-sdk/s3-request-presigner"
+      ],
+      "devDependencies": [],
+      "envVars": [
+        "AWS_REGION=us-east-1",
+        "AWS_ACCESS_KEY_ID=",
+        "AWS_SECRET_ACCESS_KEY=",
+        "S3_BUCKET_NAME="
+      ],
+      "files": [
+        {
+          "path": "src/libs/upload.ts",
+          "content": "import {\n  S3Client,\n  PutObjectCommand,\n  GetObjectCommand,\n  DeleteObjectCommand,\n  HeadObjectCommand,\n} from '@aws-sdk/client-s3';\nimport { getSignedUrl } from '@aws-sdk/s3-request-presigner';\nimport { createHash, randomBytes } from 'crypto';\n\n/**\n * S3 client configuration\n */\nconst s3Client = new S3Client({\n  region: process.env.AWS_REGION || 'us-east-1',\n  credentials: process.env.AWS_ACCESS_KEY_ID\n    ? {\n        accessKeyId: process.env.AWS_ACCESS_KEY_ID,\n        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || '',\n      }\n    : undefined, // Use IAM role if no credentials provided\n});\n\nconst BUCKET = process.env.S3_BUCKET || '';\n\n/**\n * Generate a unique file key with date-based organization\n */\nconst generateKey = (filename: string, folder = 'uploads'): string => {\n  const ext = filename.split('.').pop() || '';\n  const uniqueId = randomBytes(8).toString('hex');\n  const date = new Date().toISOString().split('T')[0];\n  return `${folder}/${date}/${uniqueId}.${ext}`;\n};\n\n/**\n * Generate a presigned PUT URL for direct browser upload\n * Client uploads file directly to S3 using PUT request\n * \n * @example\n * // Server: Generate URL\n * const { uploadUrl, key } = await getPresignedPutUrl('image.png', 'image/png');\n * \n * // Client: Upload file\n * await fetch(uploadUrl, { method: 'PUT', body: file, headers: { 'Content-Type': 'image/png' } });\n */\nexport const getPresignedPutUrl = async (\n  filename: string,\n  contentType: string,\n  options: {\n    expiresIn?: number; // seconds, default: 5 minutes\n    folder?: string;\n    maxSize?: number; // bytes\n  } = {}\n): Promise<{ uploadUrl: string; key: string; publicUrl: string }> => {\n  const { expiresIn = 300, folder = 'uploads' } = options;\n  const key = generateKey(filename, folder);\n\n  const command = new PutObjectCommand({\n    Bucket: BUCKET,\n    Key: key,\n    ContentType: contentType,\n  });\n\n  const uploadUrl = await getSignedUrl(s3Client, command, { expiresIn });\n  const publicUrl = `https://${BUCKET}.s3.amazonaws.com/${key}`;\n\n  return { uploadUrl, key, publicUrl };\n};\n\n/**\n * Generate a presigned POST policy for form-based uploads\n * Allows setting conditions like max file size, content type restrictions\n * \n * @example\n * // Server: Generate policy\n * const policy = await getPresignedPostPolicy('image.png', 'image/', { maxSize: 5 * 1024 * 1024 });\n * \n * // Client: Upload using FormData\n * const formData = new FormData();\n * Object.entries(policy.fields).forEach(([k, v]) => formData.append(k, v));\n * formData.append('file', file);\n * await fetch(policy.url, { method: 'POST', body: formData });\n */\nexport const getPresignedPostPolicy = async (\n  filename: string,\n  contentTypePrefix: string, // e.g., 'image/' to allow any image\n  options: {\n    expiresIn?: number; // seconds, default: 5 minutes\n    folder?: string;\n    maxSize?: number; // bytes, default: 10MB\n  } = {}\n): Promise<{\n  url: string;\n  fields: Record<string, string>;\n  key: string;\n  publicUrl: string;\n}> => {\n  const { createPresignedPost } = await import('@aws-sdk/s3-presigned-post');\n  const { expiresIn = 300, folder = 'uploads', maxSize = 10 * 1024 * 1024 } = options;\n  const key = generateKey(filename, folder);\n\n  const { url, fields } = await createPresignedPost(s3Client, {\n    Bucket: BUCKET,\n    Key: key,\n    Conditions: [\n      ['content-length-range', 0, maxSize],\n      ['starts-with', '$Content-Type', contentTypePrefix],\n    ],\n    Expires: expiresIn,\n  });\n\n  const publicUrl = `https://${BUCKET}.s3.amazonaws.com/${key}`;\n\n  return { url, fields, key, publicUrl };\n};\n\n/**\n * Generate a presigned download URL for private files\n */\nexport const getPresignedDownloadUrl = async (\n  key: string,\n  expiresIn = 3600 // 1 hour default\n): Promise<string> => {\n  const command = new GetObjectCommand({\n    Bucket: BUCKET,\n    Key: key,\n  });\n\n  return getSignedUrl(s3Client, command, { expiresIn });\n};\n\n/**\n * Delete a file from S3\n */\nexport const deleteFile = async (key: string): Promise<void> => {\n  await s3Client.send(\n    new DeleteObjectCommand({\n      Bucket: BUCKET,\n      Key: key,\n    })\n  );\n};\n\n/**\n * Check if a file exists in S3\n */\nexport const fileExists = async (key: string): Promise<boolean> => {\n  try {\n    await s3Client.send(\n      new HeadObjectCommand({\n        Bucket: BUCKET,\n        Key: key,\n      })\n    );\n    return true;\n  } catch {\n    return false;\n  }\n};\n\n/**\n * Get file metadata from S3\n */\nexport const getFileMetadata = async (key: string) => {\n  const response = await s3Client.send(\n    new HeadObjectCommand({\n      Bucket: BUCKET,\n      Key: key,\n    })\n  );\n\n  return {\n    contentType: response.ContentType,\n    contentLength: response.ContentLength,\n    lastModified: response.LastModified,\n    etag: response.ETag,\n  };\n};\n\n/**\n * Upload a file buffer directly (server-side upload)\n */\nexport const uploadFile = async (\n  buffer: Buffer,\n  filename: string,\n  contentType: string,\n  folder = 'uploads'\n): Promise<{ key: string; url: string }> => {\n  const key = generateKey(filename, folder);\n\n  await s3Client.send(\n    new PutObjectCommand({\n      Bucket: BUCKET,\n      Key: key,\n      Body: buffer,\n      ContentType: contentType,\n    })\n  );\n\n  const url = `https://${BUCKET}.s3.amazonaws.com/${key}`;\n  return { key, url };\n};\n"
+        }
+      ],
+      "featureType": "upload"
+    }
+  ],
+  "presets": [
+    {
+      "name": "security-basic",
+      "category": "presets",
+      "description": "Basic security middleware bundle (Helmet, CORS, Rate Limiting)",
+      "framework": "express",
+      "dependencies": [
+        "helmet",
+        "cors",
+        "express-rate-limit"
+      ],
+      "devDependencies": [
+        "@types/cors",
+        "@types/express",
+        "@types/node"
+      ],
+      "envVars": [
+        "CORS_ORIGIN=http://localhost:3000",
+        "RATE_LIMIT_WINDOW_MS=900000",
+        "RATE_LIMIT_MAX=100"
+      ],
+      "files": [
+        {
+          "path": "src/middleware/security/helmet.ts",
+          "content": "import helmet from 'helmet';\nimport { RequestHandler } from 'express';\n\n/**\n * Production-ready security headers configuration\n * Customize based on your application's needs\n */\nexport const securityHeaders: RequestHandler = helmet({\n  // Content Security Policy - adjust for your needs\n  contentSecurityPolicy: {\n    directives: {\n      defaultSrc: [\"'self'\"],\n      styleSrc: [\"'self'\", \"'unsafe-inline'\"], // Allow inline styles if needed\n      scriptSrc: [\"'self'\"],\n      imgSrc: [\"'self'\", 'data:', 'https:'],\n      connectSrc: [\"'self'\"],\n      fontSrc: [\"'self'\"],\n      objectSrc: [\"'none'\"],\n      mediaSrc: [\"'self'\"],\n      frameSrc: [\"'none'\"],\n      upgradeInsecureRequests: [],\n    },\n  },\n  \n  // Strict Transport Security - force HTTPS\n  hsts: {\n    maxAge: 31536000, // 1 year\n    includeSubDomains: true,\n    preload: true,\n  },\n  \n  // Prevent clickjacking\n  frameguard: {\n    action: 'deny',\n  },\n  \n  // Prevent MIME type sniffing\n  noSniff: true,\n  \n  // XSS Protection (legacy browsers)\n  xssFilter: true,\n  \n  // Hide X-Powered-By header\n  hidePoweredBy: true,\n  \n  // Referrer Policy\n  referrerPolicy: {\n    policy: 'strict-origin-when-cross-origin',\n  },\n  \n  // Permissions Policy (formerly Feature Policy)\n  permittedCrossDomainPolicies: {\n    permittedPolicies: 'none',\n  },\n});\n\n/**\n * Relaxed security headers for development\n * DO NOT use in production!\n */\nexport const devSecurityHeaders: RequestHandler = helmet({\n  contentSecurityPolicy: false, // Disable CSP for easier development\n  hsts: false, // Don't force HTTPS in development\n});\n\n/**\n * API-specific security headers (no CSP needed)\n */\nexport const apiSecurityHeaders: RequestHandler = helmet({\n  contentSecurityPolicy: false, // APIs don't serve HTML\n  frameguard: false, // Not applicable for APIs\n  hsts: {\n    maxAge: 31536000,\n    includeSubDomains: true,\n  },\n});\n\n/**\n * Get appropriate security headers based on environment\n */\nexport const getSecurityHeaders = (): RequestHandler => {\n  const env = process.env.NODE_ENV || 'development';\n  return env === 'production' ? securityHeaders : devSecurityHeaders;\n};\n"
+        },
+        {
+          "path": "src/middleware/security/rate-limiter.ts",
+          "content": "import rateLimit, { RateLimitRequestHandler } from 'express-rate-limit';\nimport { Request, Response } from 'express';\n\n/**\n * Default rate limiter for general API endpoints\n * 100 requests per 15 minutes per IP\n */\nexport const defaultLimiter: RateLimitRequestHandler = rateLimit({\n  windowMs: 15 * 60 * 1000, // 15 minutes\n  max: 100,\n  message: {\n    success: false,\n    message: 'Too many requests, please try again later.',\n  },\n  standardHeaders: true, // Return rate limit info in `RateLimit-*` headers\n  legacyHeaders: false,  // Disable `X-RateLimit-*` headers\n  keyGenerator: (req: Request) => {\n    // Use X-Forwarded-For for proxied requests, fallback to IP\n    return (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() \n      || req.ip \n      || 'unknown';\n  },\n});\n\n/**\n * Strict rate limiter for authentication endpoints\n * 5 attempts per 15 minutes per IP\n */\nexport const authLimiter: RateLimitRequestHandler = rateLimit({\n  windowMs: 15 * 60 * 1000, // 15 minutes\n  max: 5,\n  message: {\n    success: false,\n    message: 'Too many login attempts, please try again after 15 minutes.',\n  },\n  standardHeaders: true,\n  legacyHeaders: false,\n  skipSuccessfulRequests: true, // Don't count successful logins\n  keyGenerator: (req: Request) => {\n    return (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() \n      || req.ip \n      || 'unknown';\n  },\n});\n\n/**\n * API rate limiter for external API consumers\n * 1000 requests per hour per API key or IP\n */\nexport const apiLimiter: RateLimitRequestHandler = rateLimit({\n  windowMs: 60 * 60 * 1000, // 1 hour\n  max: 1000,\n  message: {\n    success: false,\n    message: 'API rate limit exceeded. Please try again later.',\n  },\n  standardHeaders: true,\n  legacyHeaders: false,\n  keyGenerator: (req: Request) => {\n    // Use API key if available, otherwise fall back to IP\n    const apiKey = req.headers['x-api-key'];\n    if (typeof apiKey === 'string') return apiKey;\n    \n    return (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() \n      || req.ip \n      || 'unknown';\n  },\n});\n\n/**\n * Create a custom rate limiter with specific options\n */\nexport const createLimiter = (options: {\n  windowMs: number;\n  max: number;\n  message?: string;\n  keyGenerator?: (req: Request) => string;\n}): RateLimitRequestHandler => {\n  return rateLimit({\n    windowMs: options.windowMs,\n    max: options.max,\n    message: {\n      success: false,\n      message: options.message || 'Too many requests.',\n    },\n    standardHeaders: true,\n    legacyHeaders: false,\n    keyGenerator: options.keyGenerator || ((req: Request) => {\n      return (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() \n        || req.ip \n        || 'unknown';\n    }),\n  });\n};\n"
+        },
+        {
+          "path": "src/libs/cors.ts",
+          "content": "import cors, { CorsOptions } from \"cors\";\n\n/**\n * Parses environment variables to get allowed origins, methods, and headers.\n */\nconst getEnvConfig = () => {\n  const allowedOrigins: string[] = (process.env.CORS_ORIGINS ?? \"\")\n    .split(\",\")\n    .map((o: string) => o.trim())\n    .filter((o: string) => o.length > 0);\n\n  const allowedMethods: string[] = (process.env.CORS_METHODS ?? \"\")\n    .split(\",\")\n    .map((m: string) => m.trim())\n    .filter((m: string) => m.length > 0);\n\n  const allowedHeaders: string[] = (process.env.CORS_HEADERS ?? \"\")\n    .split(\",\")\n    .map((h: string) => h.trim())\n    .filter((h: string) => h.length > 0);\n\n  return { allowedOrigins, allowedMethods, allowedHeaders };\n};\n\nexport const { allowedOrigins, allowedMethods, allowedHeaders } =\n  getEnvConfig();\n\n/**\n * Creates valid CorsOptions based on provided or environment configuration.\n */\nexport const createCorsOptions = (\n  overrides?: Partial<CorsOptions> & {\n    origins?: string[];\n    methods?: string[];\n    headers?: string[];\n  }\n): CorsOptions => {\n  const origins = overrides?.origins ?? allowedOrigins;\n  const methods = overrides?.methods ?? allowedMethods;\n  const headers = overrides?.headers ?? allowedHeaders;\n\n  return {\n    origin: (\n      origin: string | undefined,\n      callback: (error: Error | null, allow?: boolean) => void\n    ) => {\n      // Allow requests with no origin (mobile apps, curl, same-origin)\n      if (!origin) return callback(null, true);\n\n      if (origins.length === 0 || origins.includes(origin)) {\n        callback(null, true);\n      } else {\n        callback(new Error(\"Not allowed by CORS\"));\n      }\n    },\n    methods,\n    allowedHeaders: headers,\n    credentials: true,\n    ...overrides,\n  };\n};\n\n/**\n * Check if critical CORS configuration is missing.\n * Useful for validating environment setup on startup.\n */\nexport const validateCorsConfig = () => {\n  if (\n    !allowedOrigins.length ||\n    !allowedMethods.length ||\n    !allowedHeaders.length\n  ) {\n    console.warn(\n      \" CORS configuration might be incomplete. Check CORS_ORIGINS, CORS_METHODS, and CORS_HEADERS .env variables.\"\n    );\n    return false;\n  }\n  return true;\n};\n\n// Default export uses strict environment variables but doesn't hard exit only warns if missing,\n// unless strict validation is called.\nconst defaultOptions = createCorsOptions();\nexport const corsMiddleware = cors(defaultOptions);\n"
+        }
+      ]
+    },
+    {
+      "name": "security-strict",
+      "category": "presets",
+      "description": "Production security middleware bundle with sanitization and request IDs",
+      "framework": "express",
+      "dependencies": [
+        "helmet",
+        "cors",
+        "express-rate-limit",
+        "sanitize-html",
+        "compression",
+        "uuid"
+      ],
+      "devDependencies": [
+        "@types/cors",
+        "@types/sanitize-html",
+        "@types/compression",
+        "@types/uuid",
+        "@types/express",
+        "@types/node"
+      ],
+      "envVars": [
+        "CORS_ORIGIN=http://localhost:3000",
+        "RATE_LIMIT_WINDOW_MS=900000",
+        "RATE_LIMIT_MAX=100"
+      ],
+      "files": [
+        {
+          "path": "src/middleware/security/helmet.ts",
+          "content": "import helmet from 'helmet';\nimport { RequestHandler } from 'express';\n\n/**\n * Production-ready security headers configuration\n * Customize based on your application's needs\n */\nexport const securityHeaders: RequestHandler = helmet({\n  // Content Security Policy - adjust for your needs\n  contentSecurityPolicy: {\n    directives: {\n      defaultSrc: [\"'self'\"],\n      styleSrc: [\"'self'\", \"'unsafe-inline'\"], // Allow inline styles if needed\n      scriptSrc: [\"'self'\"],\n      imgSrc: [\"'self'\", 'data:', 'https:'],\n      connectSrc: [\"'self'\"],\n      fontSrc: [\"'self'\"],\n      objectSrc: [\"'none'\"],\n      mediaSrc: [\"'self'\"],\n      frameSrc: [\"'none'\"],\n      upgradeInsecureRequests: [],\n    },\n  },\n  \n  // Strict Transport Security - force HTTPS\n  hsts: {\n    maxAge: 31536000, // 1 year\n    includeSubDomains: true,\n    preload: true,\n  },\n  \n  // Prevent clickjacking\n  frameguard: {\n    action: 'deny',\n  },\n  \n  // Prevent MIME type sniffing\n  noSniff: true,\n  \n  // XSS Protection (legacy browsers)\n  xssFilter: true,\n  \n  // Hide X-Powered-By header\n  hidePoweredBy: true,\n  \n  // Referrer Policy\n  referrerPolicy: {\n    policy: 'strict-origin-when-cross-origin',\n  },\n  \n  // Permissions Policy (formerly Feature Policy)\n  permittedCrossDomainPolicies: {\n    permittedPolicies: 'none',\n  },\n});\n\n/**\n * Relaxed security headers for development\n * DO NOT use in production!\n */\nexport const devSecurityHeaders: RequestHandler = helmet({\n  contentSecurityPolicy: false, // Disable CSP for easier development\n  hsts: false, // Don't force HTTPS in development\n});\n\n/**\n * API-specific security headers (no CSP needed)\n */\nexport const apiSecurityHeaders: RequestHandler = helmet({\n  contentSecurityPolicy: false, // APIs don't serve HTML\n  frameguard: false, // Not applicable for APIs\n  hsts: {\n    maxAge: 31536000,\n    includeSubDomains: true,\n  },\n});\n\n/**\n * Get appropriate security headers based on environment\n */\nexport const getSecurityHeaders = (): RequestHandler => {\n  const env = process.env.NODE_ENV || 'development';\n  return env === 'production' ? securityHeaders : devSecurityHeaders;\n};\n"
+        },
+        {
+          "path": "src/middleware/security/rate-limiter.ts",
+          "content": "import rateLimit, { RateLimitRequestHandler } from 'express-rate-limit';\nimport { Request, Response } from 'express';\n\n/**\n * Default rate limiter for general API endpoints\n * 100 requests per 15 minutes per IP\n */\nexport const defaultLimiter: RateLimitRequestHandler = rateLimit({\n  windowMs: 15 * 60 * 1000, // 15 minutes\n  max: 100,\n  message: {\n    success: false,\n    message: 'Too many requests, please try again later.',\n  },\n  standardHeaders: true, // Return rate limit info in `RateLimit-*` headers\n  legacyHeaders: false,  // Disable `X-RateLimit-*` headers\n  keyGenerator: (req: Request) => {\n    // Use X-Forwarded-For for proxied requests, fallback to IP\n    return (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() \n      || req.ip \n      || 'unknown';\n  },\n});\n\n/**\n * Strict rate limiter for authentication endpoints\n * 5 attempts per 15 minutes per IP\n */\nexport const authLimiter: RateLimitRequestHandler = rateLimit({\n  windowMs: 15 * 60 * 1000, // 15 minutes\n  max: 5,\n  message: {\n    success: false,\n    message: 'Too many login attempts, please try again after 15 minutes.',\n  },\n  standardHeaders: true,\n  legacyHeaders: false,\n  skipSuccessfulRequests: true, // Don't count successful logins\n  keyGenerator: (req: Request) => {\n    return (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() \n      || req.ip \n      || 'unknown';\n  },\n});\n\n/**\n * API rate limiter for external API consumers\n * 1000 requests per hour per API key or IP\n */\nexport const apiLimiter: RateLimitRequestHandler = rateLimit({\n  windowMs: 60 * 60 * 1000, // 1 hour\n  max: 1000,\n  message: {\n    success: false,\n    message: 'API rate limit exceeded. Please try again later.',\n  },\n  standardHeaders: true,\n  legacyHeaders: false,\n  keyGenerator: (req: Request) => {\n    // Use API key if available, otherwise fall back to IP\n    const apiKey = req.headers['x-api-key'];\n    if (typeof apiKey === 'string') return apiKey;\n    \n    return (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() \n      || req.ip \n      || 'unknown';\n  },\n});\n\n/**\n * Create a custom rate limiter with specific options\n */\nexport const createLimiter = (options: {\n  windowMs: number;\n  max: number;\n  message?: string;\n  keyGenerator?: (req: Request) => string;\n}): RateLimitRequestHandler => {\n  return rateLimit({\n    windowMs: options.windowMs,\n    max: options.max,\n    message: {\n      success: false,\n      message: options.message || 'Too many requests.',\n    },\n    standardHeaders: true,\n    legacyHeaders: false,\n    keyGenerator: options.keyGenerator || ((req: Request) => {\n      return (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() \n        || req.ip \n        || 'unknown';\n    }),\n  });\n};\n"
+        },
+        {
+          "path": "src/middleware/security/sanitize.ts",
+          "content": "import { Request, Response, NextFunction } from 'express';\nimport sanitizeHtml from 'sanitize-html';\n\n/**\n * Sanitization options\n * Strips all HTML by default - adjust based on your needs\n */\nconst strictOptions: sanitizeHtml.IOptions = {\n  allowedTags: [],\n  allowedAttributes: {},\n  disallowedTagsMode: 'discard',\n};\n\n/**\n * Allow basic formatting tags (for rich text fields)\n */\nconst richTextOptions: sanitizeHtml.IOptions = {\n  allowedTags: ['b', 'i', 'u', 'em', 'strong', 'a', 'p', 'br', 'ul', 'ol', 'li'],\n  allowedAttributes: {\n    a: ['href', 'title', 'target'],\n  },\n  allowedSchemes: ['http', 'https', 'mailto'],\n};\n\n/**\n * Recursively sanitize all string values in an object\n */\nconst sanitizeObject = (\n  obj: unknown,\n  options: sanitizeHtml.IOptions = strictOptions\n): unknown => {\n  if (typeof obj === 'string') {\n    return sanitizeHtml(obj, options).trim();\n  }\n\n  if (Array.isArray(obj)) {\n    return obj.map((item) => sanitizeObject(item, options));\n  }\n\n  if (obj !== null && typeof obj === 'object') {\n    const sanitized: Record<string, unknown> = {};\n    for (const [key, value] of Object.entries(obj)) {\n      sanitized[key] = sanitizeObject(value, options);\n    }\n    return sanitized;\n  }\n\n  return obj;\n};\n\n/**\n * Strict sanitization middleware\n * Removes ALL HTML tags from request body, query, and params\n */\nexport const sanitizeStrict = (\n  req: Request,\n  _res: Response,\n  next: NextFunction\n) => {\n  if (req.body) {\n    req.body = sanitizeObject(req.body, strictOptions);\n  }\n  if (req.query) {\n    req.query = sanitizeObject(req.query, strictOptions) as typeof req.query;\n  }\n  if (req.params) {\n    req.params = sanitizeObject(req.params, strictOptions) as typeof req.params;\n  }\n  next();\n};\n\n/**\n * Rich text sanitization middleware\n * Allows basic formatting tags but strips dangerous content\n */\nexport const sanitizeRichText = (\n  req: Request,\n  _res: Response,\n  next: NextFunction\n) => {\n  if (req.body) {\n    req.body = sanitizeObject(req.body, richTextOptions);\n  }\n  next();\n};\n\n/**\n * Sanitize specific fields only\n * @param fields - Array of field names to sanitize in request body\n * @param allowRichText - If true, allows basic formatting tags\n */\nexport const sanitizeFields = (fields: string[], allowRichText = false) => {\n  const options = allowRichText ? richTextOptions : strictOptions;\n\n  return (req: Request, _res: Response, next: NextFunction) => {\n    if (req.body && typeof req.body === 'object') {\n      for (const field of fields) {\n        if (field in req.body && typeof req.body[field] === 'string') {\n          req.body[field] = sanitizeHtml(req.body[field], options).trim();\n        }\n      }\n    }\n    next();\n  };\n};\n\n/**\n * Utility function for manual sanitization\n */\nexport const sanitize = (\n  input: string,\n  allowRichText = false\n): string => {\n  const options = allowRichText ? richTextOptions : strictOptions;\n  return sanitizeHtml(input, options).trim();\n};\n"
+        },
+        {
+          "path": "src/libs/cors.ts",
+          "content": "import cors, { CorsOptions } from \"cors\";\n\n/**\n * Parses environment variables to get allowed origins, methods, and headers.\n */\nconst getEnvConfig = () => {\n  const allowedOrigins: string[] = (process.env.CORS_ORIGINS ?? \"\")\n    .split(\",\")\n    .map((o: string) => o.trim())\n    .filter((o: string) => o.length > 0);\n\n  const allowedMethods: string[] = (process.env.CORS_METHODS ?? \"\")\n    .split(\",\")\n    .map((m: string) => m.trim())\n    .filter((m: string) => m.length > 0);\n\n  const allowedHeaders: string[] = (process.env.CORS_HEADERS ?? \"\")\n    .split(\",\")\n    .map((h: string) => h.trim())\n    .filter((h: string) => h.length > 0);\n\n  return { allowedOrigins, allowedMethods, allowedHeaders };\n};\n\nexport const { allowedOrigins, allowedMethods, allowedHeaders } =\n  getEnvConfig();\n\n/**\n * Creates valid CorsOptions based on provided or environment configuration.\n */\nexport const createCorsOptions = (\n  overrides?: Partial<CorsOptions> & {\n    origins?: string[];\n    methods?: string[];\n    headers?: string[];\n  }\n): CorsOptions => {\n  const origins = overrides?.origins ?? allowedOrigins;\n  const methods = overrides?.methods ?? allowedMethods;\n  const headers = overrides?.headers ?? allowedHeaders;\n\n  return {\n    origin: (\n      origin: string | undefined,\n      callback: (error: Error | null, allow?: boolean) => void\n    ) => {\n      // Allow requests with no origin (mobile apps, curl, same-origin)\n      if (!origin) return callback(null, true);\n\n      if (origins.length === 0 || origins.includes(origin)) {\n        callback(null, true);\n      } else {\n        callback(new Error(\"Not allowed by CORS\"));\n      }\n    },\n    methods,\n    allowedHeaders: headers,\n    credentials: true,\n    ...overrides,\n  };\n};\n\n/**\n * Check if critical CORS configuration is missing.\n * Useful for validating environment setup on startup.\n */\nexport const validateCorsConfig = () => {\n  if (\n    !allowedOrigins.length ||\n    !allowedMethods.length ||\n    !allowedHeaders.length\n  ) {\n    console.warn(\n      \" CORS configuration might be incomplete. Check CORS_ORIGINS, CORS_METHODS, and CORS_HEADERS .env variables.\"\n    );\n    return false;\n  }\n  return true;\n};\n\n// Default export uses strict environment variables but doesn't hard exit only warns if missing,\n// unless strict validation is called.\nconst defaultOptions = createCorsOptions();\nexport const corsMiddleware = cors(defaultOptions);\n"
+        },
+        {
+          "path": "src/middleware/request-id.ts",
+          "content": "import { Request, Response, NextFunction } from 'express';\nimport { v4 as uuidv4 } from 'uuid';\n\n/**\n * Header names for request ID\n */\nconst REQUEST_ID_HEADER = 'X-Request-ID';\nconst CORRELATION_ID_HEADER = 'X-Correlation-ID';\n\n/**\n * Extended request with ID fields\n */\nexport interface RequestWithId extends Request {\n  id: string;\n  correlationId?: string;\n}\n\n/**\n * Request ID Middleware\n * \n * Generates a unique ID for each request and attaches it to:\n * - req.id (for use in application code)\n * - Response header X-Request-ID (for client correlation)\n * \n * If the client sends X-Request-ID, it will be preserved.\n * If X-Correlation-ID is sent, it's stored for distributed tracing.\n */\nexport const requestId = (\n  req: RequestWithId,\n  res: Response,\n  next: NextFunction\n) => {\n  // Use existing request ID from client or generate new one\n  const existingId = req.headers[REQUEST_ID_HEADER.toLowerCase()] as string;\n  const id = existingId || uuidv4();\n\n  // Store correlation ID if provided (for distributed tracing)\n  const correlationId = req.headers[CORRELATION_ID_HEADER.toLowerCase()] as string;\n\n  // Attach to request object\n  req.id = id;\n  if (correlationId) {\n    req.correlationId = correlationId;\n  }\n\n  // Set response header so client can correlate\n  res.setHeader(REQUEST_ID_HEADER, id);\n  if (correlationId) {\n    res.setHeader(CORRELATION_ID_HEADER, correlationId);\n  }\n\n  next();\n};\n\n/**\n * Get request ID from request object (type-safe)\n */\nexport const getRequestId = (req: Request): string => {\n  return (req as RequestWithId).id || 'unknown';\n};\n\n/**\n * Create a child logger context with request ID\n * Useful for structured logging\n * \n * @example\n * const context = createLogContext(req);\n * logger.info('User logged in', context);\n * // Output: { requestId: '...', correlationId: '...', message: 'User logged in' }\n */\nexport const createLogContext = (req: Request) => {\n  const typedReq = req as RequestWithId;\n  return {\n    requestId: typedReq.id,\n    correlationId: typedReq.correlationId,\n    method: req.method,\n    path: req.path,\n    ip: req.ip,\n  };\n};\n"
+        },
+        {
+          "path": "src/middleware/compression.ts",
+          "content": "import compression from 'compression';\nimport { Request, Response, RequestHandler } from 'express';\n\n/**\n * Default compression middleware\n * Compresses responses larger than 1KB using gzip\n */\nexport const compress: RequestHandler = compression({\n  // Only compress responses larger than 1KB\n  threshold: 1024,\n  \n  // Compression level (1-9, higher = more compression but slower)\n  level: 6,\n  \n  // Filter function to decide what to compress\n  filter: (req: Request, res: Response) => {\n    // Don't compress if client doesn't accept it\n    if (req.headers['x-no-compression']) {\n      return false;\n    }\n    \n    // Use compression's default filter (checks Accept-Encoding)\n    return compression.filter(req, res);\n  },\n});\n\n/**\n * Aggressive compression for bandwidth-critical applications\n * Higher compression level, lower threshold\n */\nexport const compressAggressive: RequestHandler = compression({\n  threshold: 512,\n  level: 9,\n  filter: (req: Request, res: Response) => {\n    if (req.headers['x-no-compression']) {\n      return false;\n    }\n    return compression.filter(req, res);\n  },\n});\n\n/**\n * Light compression for CPU-constrained servers\n * Lower compression level, higher threshold\n */\nexport const compressLight: RequestHandler = compression({\n  threshold: 2048,\n  level: 1,\n  filter: (req: Request, res: Response) => {\n    if (req.headers['x-no-compression']) {\n      return false;\n    }\n    return compression.filter(req, res);\n  },\n});\n\n/**\n * Skip compression for specific content types\n * Useful when serving already-compressed content (images, videos)\n */\nexport const compressSelectiveTypes: RequestHandler = compression({\n  threshold: 1024,\n  level: 6,\n  filter: (req: Request, res: Response) => {\n    const contentType = res.getHeader('Content-Type') as string;\n    \n    // Skip already-compressed formats\n    const skipTypes = [\n      'image/',\n      'video/',\n      'audio/',\n      'application/zip',\n      'application/gzip',\n      'application/x-rar',\n    ];\n    \n    if (contentType && skipTypes.some(type => contentType.includes(type))) {\n      return false;\n    }\n    \n    if (req.headers['x-no-compression']) {\n      return false;\n    }\n    \n    return compression.filter(req, res);\n  },\n});\n"
+        }
+      ]
+    }
+  ],
+  "extra": []
+}
