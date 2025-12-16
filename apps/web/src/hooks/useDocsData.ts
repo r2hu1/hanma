@@ -4,6 +4,7 @@ import type {
   TabType,
   SnippetFramework,
   TemplatesData,
+  TemplateCategory,
   ModulesData,
   SnippetCategory,
 } from "../types/docs";
@@ -81,11 +82,38 @@ export function useDocsData(): UseDocsDataReturn {
             setActiveCategory(categories[0].id);
           }
         } else if (activeTab === "templates" && !templatesData) {
-          const res = await fetch("/docs/templates/index.json");
-          const data = await res.json();
-          setTemplatesData(data);
-          if (data.categories?.length > 0) {
-            setActiveCategory(data.categories[0].id);
+          // Fetch from framework-specific directory (express for now)
+          const indexRes = await fetch("/docs/templates/express/index.json");
+          const indexData = await indexRes.json();
+
+          // Fetch all category files in parallel
+          const categoryPromises = indexData.categoryFiles.map(
+            async (catFile: {
+              id: string;
+              file: string;
+              title: string;
+              description: string;
+            }) => {
+              const res = await fetch(
+                `/docs/templates/express/${catFile.file}`,
+              );
+              return res.json();
+            },
+          );
+          const categories: TemplateCategory[] =
+            await Promise.all(categoryPromises);
+
+          // Merge into TemplatesData structure
+          const mergedData: TemplatesData = {
+            title: indexData.title,
+            description: indexData.description,
+            categories,
+            examples: indexData.examples,
+          };
+
+          setTemplatesData(mergedData);
+          if (categories.length > 0) {
+            setActiveCategory(categories[0].id);
           }
         } else if (activeTab === "modules" && !modulesData) {
           const res = await fetch("/docs/modules/index.json");
