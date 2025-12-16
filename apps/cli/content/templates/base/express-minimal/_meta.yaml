@@ -1,0 +1,24 @@
+name: express-minimal
+category: base
+description: Minimal Express.js v5 setup with TypeScript
+framework: express
+version: "5"
+
+dependencies:
+  - express
+  - dotenv
+
+devDependencies:
+  - typescript
+  - "@types/node"
+  - "@types/express"
+  - tsx
+
+scripts:
+  dev: "tsx watch src/index.ts"
+  build: "tsc"
+  start: "node dist/index.js"
+
+envVars:
+  - PORT=3000
+  - NODE_ENV=development

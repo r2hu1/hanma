@@ -1,0 +1,92 @@
+{
+  "title": "Modules",
+  "description": "Modules are reusable bundles of related snippets and configurations. They provide complete solutions for specific features.",
+  "concept": {
+    "whatIsAModule": "A module is a collection of related snippets, configurations, and files that work together to implement a specific feature. Unlike individual snippets, modules include everything needed for a complete solution.",
+    "whenToUseModules": [
+      "When you need a complete feature implementation",
+      "When snippets have dependencies on each other",
+      "When you want consistent configuration across files"
+    ],
+    "modulesVsSnippets": {
+      "snippets": "Individual code files that can be used independently",
+      "modules": "Complete feature implementations with multiple files and configurations",
+      "templates": "Full project scaffolding that may include modules and snippets"
+    }
+  },
+  "modules": [
+    {
+      "id": "i18n",
+      "name": "Internationalization (i18n)",
+      "description": "Multi-language support with translation files and utilities",
+      "purpose": "Add internationalization to your application with pre-configured translation files and utilities for managing multiple languages.",
+      "features": [
+        "Pre-built translation files",
+        "English, Spanish, French, German support",
+        "Easy to extend with more languages",
+        "Consistent translation key structure",
+        "Common UI translations included"
+      ],
+      "files": [
+        {
+          "name": "en.json",
+          "description": "English translations"
+        },
+        {
+          "name": "es.json",
+          "description": "Spanish translations"
+        },
+        {
+          "name": "fr.json",
+          "description": "French translations"
+        },
+        {
+          "name": "de.json",
+          "description": "German translations"
+        }
+      ],
+      "usage": {
+        "add": "hanma add-module i18n",
+        "example": "// Using with i18next\nimport i18n from 'i18next';\nimport en from './locales/en.json';\n\ni18n.init({\n  resources: { en: { translation: en } },\n  lng: 'en',\n  fallbackLng: 'en'\n});\n\n// Usage\nt('common.welcome'); // 'Welcome'\nt('auth.login'); // 'Login'"
+      },
+      "translationKeys": {
+        "common": "General UI text (buttons, labels, messages)",
+        "auth": "Authentication-related text (login, logout, register)",
+        "errors": "Error messages and validation text",
+        "navigation": "Navigation labels and menu items",
+        "settings": "Settings and preferences text"
+      },
+      "extensibility": {
+        "addLanguage": "Create a new JSON file following the same structure",
+        "addKeys": "Add new keys to all language files to maintain consistency",
+        "organize": "Use nested objects to organize translations by feature"
+      }
+    }
+  ],
+  "upcomingModules": [
+    {
+      "id": "auth-flow",
+      "name": "Authentication Flow",
+      "description": "Complete auth implementation with login, register, forgot password",
+      "status": "planned"
+    },
+    {
+      "id": "admin-dashboard",
+      "name": "Admin Dashboard",
+      "description": "Admin panel with user management, settings, and analytics",
+      "status": "planned"
+    },
+    {
+      "id": "payment-stripe",
+      "name": "Stripe Payment",
+      "description": "Complete Stripe integration with subscriptions and webhooks",
+      "status": "planned"
+    },
+    {
+      "id": "notification-system",
+      "name": "Notification System",
+      "description": "Multi-channel notifications (email, push, in-app)",
+      "status": "planned"
+    }
+  ]
+}

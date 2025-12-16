@@ -1,3 +1,12 @@
+---
+name: error-middleware
+description: Error handling and 404 middleware for Express
+dependencies: []
+devDependencies:
+  - "@types/express"
+files:
+  - name: middleware/error.ts
+---
 import { Request, Response, NextFunction } from "express";
 
 export const errorHandler = (
@@ -6,7 +15,7 @@ export const errorHandler = (
   res: Response,
   _next: NextFunction
 ) => {
-  console.error("❌ Error:", err.stack || err.message);
+  console.error("[ERROR]", err.stack || err.message);
   res.status(500).json({
     success: false,
     message:
