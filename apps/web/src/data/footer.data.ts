@@ -1,0 +1,54 @@
+// footer.data.ts
+
+import { LuGithub, LuTwitter, LuDisc } from "react-icons/lu";
+
+export const footerMeta = {
+  brand: {
+    name: "Hanma",
+    description:
+      "The backend component library for modern developers. Built to help you ship faster without compromising on code quality or security.",
+  },
+  copyright: "© 2024 Hanma Inc. All rights reserved.",
+};
+
+export const footerLinks = [
+  {
+    id: "resources",
+    title: "Resources",
+    links: [
+      { label: "Snippets", to: "/docs", type: "internal" },
+      { label: "Templates", to: "/docs", type: "internal" },
+      { label: "Documentation", to: "/docs", type: "internal" },
+      { label: "Blog", href: "#", type: "external" },
+    ],
+  },
+  {
+    id: "company",
+    title: "Company",
+    links: [
+      { label: "About", href: "#", type: "external" },
+      { label: "Contact", href: "#", type: "external" },
+    ],
+  },
+];
+
+export const footerSocials = [
+  {
+    id: "github",
+    label: "GitHub",
+    icon: LuGithub,
+    href: "#",
+  },
+  {
+    id: "twitter",
+    label: "Twitter",
+    icon: LuTwitter,
+    href: "#",
+  },
+  {
+    id: "discord",
+    label: "Discord",
+    icon: LuDisc,
+    href: "#",
+  },
+];

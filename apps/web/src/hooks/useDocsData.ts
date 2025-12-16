@@ -5,6 +5,7 @@ import type {
   SnippetFramework,
   TemplatesData,
   ModulesData,
+  SnippetCategory,
 } from "../types/docs";
 
 interface UseDocsDataReturn {
@@ -52,11 +53,32 @@ export function useDocsData(): UseDocsDataReturn {
     const fetchData = async () => {
       try {
         if (activeTab === "snippets" && !snippetsData) {
-          const res = await fetch("/docs/snippets/express.json");
-          const data = await res.json();
-          setSnippetsData(data);
-          if (data.categories?.length > 0) {
-            setActiveCategory(data.categories[0].id);
+          const indexRes = await fetch("/docs/snippets/express/index.json");
+          const indexData = await indexRes.json();
+          const categoryPromises = indexData.categoryFiles.map(
+            async (catFile: { id: string; file: string }) => {
+              const res = await fetch(`/docs/snippets/express/${catFile.file}`);
+              return res.json();
+            },
+          );
+          const categories: SnippetCategory[] =
+            await Promise.all(categoryPromises);
+
+          // Merge into SnippetFramework structure
+          const mergedData: SnippetFramework = {
+            framework: indexData.framework,
+            version: indexData.version,
+            title: indexData.title,
+            description: indexData.description,
+            installNote: indexData.installNote,
+            concept: indexData.concept,
+            examples: indexData.examples,
+            categories,
+          };
+
+          setSnippetsData(mergedData);
+          if (categories.length > 0) {
+            setActiveCategory(categories[0].id);
           }
         } else if (activeTab === "templates" && !templatesData) {
           const res = await fetch("/docs/templates/index.json");
