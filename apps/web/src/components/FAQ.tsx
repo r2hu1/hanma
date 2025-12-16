@@ -1,28 +1,6 @@
 import { useState } from "react";
 import { BiMinus, BiPlus } from "react-icons/bi";
-
-const faqs = [
-  {
-    question: "What exactly is Hanma?",
-    answer:
-      "Hanma is not a framework or a library you install as a dependency. It is a collection of re-usable code snippets that you can copy and paste into your apps. You own the code.",
-  },
-  {
-    question: "Is it free to use?",
-    answer:
-      "Yes, the core Snippets are open source and free to use in personal and commercial projects. We also offer a Pro plan for advanced enterprise modules.",
-  },
-  {
-    question: "How do I update Snippets?",
-    answer:
-      "Since you own the code, updates are manual. However, we provide a CLI tool that can diff your local Snippets against the latest version and help you patch changes.",
-  },
-  {
-    question: "Do you support microservices?",
-    answer:
-      "Absolutely. Our Snippets are designed to be modular. You can use our gRPC or RabbitMQ snippets to easily stitch together microservices.",
-  },
-];
+import { faqs } from "../data/faq.data";
 
 const FAQ = () => {
   const [openIndex, setOpenIndex] = useState<number | null>(0);

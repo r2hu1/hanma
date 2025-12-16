@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { motion, useSpring, useTransform } from "motion/react";
+import { baseStats, githubStats } from "../data/stats.data";
 
 function Counter({ value }: { value: number }) {
   const spring = useSpring(0, { mass: 0.8, stiffness: 75, damping: 15 });
@@ -16,12 +17,12 @@ function Counter({ value }: { value: number }) {
 }
 
 export function Stats() {
-  const [stars, setStars] = useState(100);
-  const [contributors, setContributors] = useState(5);
+  const [stars, setStars] = useState(githubStats.defaultStars);
+  const [contributors, setContributors] = useState(githubStats.defaultContributors);
 
   useEffect(() => {
     // Fetch GitHub Stars
-    fetch("https://api.github.com/repos/itstheanurag/hanma")
+    fetch(`https://api.github.com/repos/${githubStats.repo}`)
       .then((res) => res.json())
       .then((data) => {
         if (data.stargazers_count) setStars(data.stargazers_count);
@@ -30,11 +31,11 @@ export function Stats() {
 
     // Fetch Contributors (simple count of first page for now)
     fetch(
-      "https://api.github.com/repos/itstheanurag/hanma/contributors?per_page=1&anon=true",
+      `https://api.github.com/repos/${githubStats.repo}/contributors?per_page=1&anon=true`,
     )
       .then((_) => {
         return fetch(
-          "https://api.github.com/repos/itstheanurag/hanma/contributors?per_page=100&anon=true",
+          `https://api.github.com/repos/${githubStats.repo}/contributors?per_page=100&anon=true`,
         );
       })
       .then((res) => res.json())
@@ -45,9 +46,11 @@ export function Stats() {
   }, []);
 
   const stats = [
-    { label: "Active Snippets", value: 10 },
-    { label: "Frameworks Support", value: 4 },
-    { label: "Type Safety", value: 100 }, // Special case handling needed for %
+    ...baseStats.map((s) => ({ 
+      label: s.label, 
+      value: s.value, 
+      isPercentage: s.isPercentage 
+    })),
     { label: "GitHub Stars", value: stars },
     { label: "Contributors", value: contributors },
   ];
@@ -65,8 +68,8 @@ export function Stats() {
             className="p-6 bg-neutral-900/30 border border-neutral-800/50 rounded-2xl text-center hover:bg-neutral-900/50 transition-colors"
           >
             <div className="text-3xl font-bold bg-gradient-to-br from-white to-neutral-500 bg-clip-text text-transparent mb-2">
-              {stat.label === "Type Safety" ? (
-                "100%"
+              {"isPercentage" in stat && stat.isPercentage ? (
+                `${stat.value}%`
               ) : (
                 <Counter value={stat.value} />
               )}

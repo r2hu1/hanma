@@ -1,27 +1,5 @@
-import { LuRepeat, LuCopy, LuTerminal, LuSparkles } from "react-icons/lu";
-
-const painPoints = [
-  {
-    icon: <LuRepeat className="text-foreground" />,
-    title: "Same CORS config",
-    description: "Every project needs the same configurable CORS setup.",
-  },
-  {
-    icon: <LuRepeat className="text-foreground" />,
-    title: "Same database init",
-    description: "Only the env values change between projects.",
-  },
-  {
-    icon: <LuRepeat className="text-foreground" />,
-    title: "Same logging setup",
-    description: "Winston, Morgan, or Pino—configured the same way every time.",
-  },
-  {
-    icon: <LuRepeat className="text-foreground" />,
-    title: "Same auth boilerplate",
-    description: "JWT validation, session handling, middleware patterns.",
-  },
-];
+import { LuCopy, LuTerminal, LuSparkles } from "react-icons/lu";
+import { painPoints } from "../data/philosophy.data";
 
 const Philosophy = () => {
   return (
@@ -53,7 +31,7 @@ const Philosophy = () => {
               className="bg-surface p-6 text-center hover:bg-surface-hover transition-colors"
             >
               <div className="w-10 h-10 bg-background border border-border rounded-lg flex items-center justify-center mb-4 mx-auto">
-                {point.icon}
+                <point.icon className="text-foreground" />
               </div>
               <h3 className="text-sm font-semibold text-foreground mb-2">
                 {point.title}
