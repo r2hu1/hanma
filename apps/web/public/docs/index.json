@@ -1,0 +1,43 @@
+{
+  "title": "Hanma Documentation",
+  "description": "Comprehensive documentation for snippets, templates, and modules across all supported frameworks.",
+  "sections": [
+    {
+      "id": "getting-started",
+      "title": "Getting Started",
+      "description": "Quick start guide for using Hanma CLI"
+    },
+    {
+      "id": "snippets",
+      "title": "Snippets",
+      "description": "Production-ready code snippets for various frameworks",
+      "frameworks": ["express"]
+    },
+    {
+      "id": "templates",
+      "title": "Templates",
+      "description": "Project scaffolding templates for quick project setup",
+      "categories": ["base", "database", "auth", "features", "presets"]
+    },
+    {
+      "id": "modules",
+      "title": "Modules",
+      "description": "Reusable bundles of related snippets and configurations",
+      "items": ["i18n"]
+    }
+  ],
+  "quickLinks": [
+    {
+      "title": "Install CLI",
+      "command": "npm install -g hanma"
+    },
+    {
+      "title": "Create Project",
+      "command": "hanma create my-api"
+    },
+    {
+      "title": "Add Snippet",
+      "command": "hanma add express/v5/libs/server"
+    }
+  ]
+}
