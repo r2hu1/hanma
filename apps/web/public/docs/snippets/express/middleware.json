@@ -1,0 +1,331 @@
+{
+  "id": "middleware",
+  "title": "Middleware",
+  "description": "Reusable Express middleware",
+  "subcategories": [
+    {
+      "id": "auth",
+      "title": "Authentication",
+      "description": "Auth and authorization middleware",
+      "snippets": [
+        {
+          "id": "jwt-auth",
+          "name": "jwt-auth",
+          "displayName": "JWT Authentication",
+          "description": "JWT middleware with role-based access",
+          "purpose": "Protect routes with JWT authentication. Supports role-based access control.",
+          "features": [
+            "JWT verification",
+            "Role-based access control",
+            "Token extraction from header/cookie",
+            "Customizable error responses"
+          ],
+          "usage": "import { authenticate, authorize } from './middleware/auth/jwt-auth';\n\napp.get('/admin', authenticate, authorize(['admin']), handler);",
+          "output": "middleware/auth/jwt-auth.ts",
+          "dependencies": ["jsonwebtoken"],
+          "command": "npx hanma add jwt-auth"
+        },
+        {
+          "id": "api-key-auth",
+          "name": "api-key-auth",
+          "displayName": "API Key Authentication",
+          "description": "API key auth for service-to-service",
+          "purpose": "Simple API key authentication. Best for internal services or third-party integrations.",
+          "features": [
+            "Header-based API key",
+            "Multiple key support",
+            "Key validation",
+            "No external dependencies"
+          ],
+          "usage": "import { apiKeyAuth } from './middleware/auth/api-key-auth';\n\napp.use('/api', apiKeyAuth);",
+          "output": "middleware/auth/api-key-auth.ts",
+          "dependencies": [],
+          "command": "npx hanma add api-key-auth"
+        }
+      ]
+    },
+    {
+      "id": "security",
+      "title": "Security",
+      "description": "Security middleware",
+      "snippets": [
+        {
+          "id": "helmet",
+          "name": "helmet",
+          "displayName": "Helmet Security Headers",
+          "description": "Secure HTTP headers",
+          "purpose": "Set security-related HTTP headers. Essential for production deployments.",
+          "features": [
+            "Content Security Policy",
+            "XSS protection",
+            "Clickjacking prevention",
+            "HSTS support"
+          ],
+          "usage": "import { helmetMiddleware } from './middleware/security/helmet';\n\napp.use(helmetMiddleware);",
+          "output": "middleware/security/helmet.ts",
+          "dependencies": ["helmet"],
+          "command": "npx hanma add helmet"
+        },
+        {
+          "id": "rate-limiter",
+          "name": "rate-limiter",
+          "displayName": "Rate Limiter",
+          "description": "Request rate limiting",
+          "purpose": "Prevent abuse by limiting request frequency. Essential for public APIs.",
+          "features": [
+            "Configurable window and limits",
+            "Redis store support",
+            "Skip by IP or user",
+            "Custom key generation"
+          ],
+          "usage": "import { rateLimiter } from './middleware/security/rate-limiter';\n\napp.use('/api', rateLimiter({ windowMs: 60000, max: 100 }));",
+          "output": "middleware/security/rate-limiter.ts",
+          "dependencies": ["express-rate-limit"],
+          "command": "npx hanma add rate-limiter"
+        },
+        {
+          "id": "sanitize",
+          "name": "sanitize",
+          "displayName": "Input Sanitization",
+          "description": "XSS prevention and sanitization",
+          "purpose": "Clean user input to prevent XSS attacks. Use on all user-submitted content.",
+          "features": [
+            "HTML sanitization",
+            "Configurable allowed tags",
+            "Strip dangerous attributes",
+            "URL sanitization"
+          ],
+          "usage": "import { sanitize } from './middleware/security/sanitize';\n\nconst cleanHtml = sanitize(userInput);",
+          "output": "middleware/security/sanitize.ts",
+          "dependencies": ["sanitize-html"],
+          "command": "npx hanma add sanitize"
+        }
+      ]
+    },
+    {
+      "id": "passwords",
+      "title": "Password Hashing",
+      "description": "Password hashing utilities",
+      "snippets": [
+        {
+          "id": "password-argon2",
+          "name": "password-argon2",
+          "displayName": "Argon2 Password",
+          "description": "Argon2id hashing (recommended)",
+          "purpose": "Hash passwords with Argon2id - the winner of the Password Hashing Competition. Most secure option.",
+          "features": [
+            "Argon2id algorithm",
+            "Configurable memory cost",
+            "Time cost tuning",
+            "Constant-time verification"
+          ],
+          "usage": "import { hashPassword, verifyPassword } from './middleware/passwords/password-argon2';\n\nconst hash = await hashPassword('secret');\nconst valid = await verifyPassword('secret', hash);",
+          "output": "middleware/passwords/password-argon2.ts",
+          "dependencies": ["argon2"],
+          "command": "npx hanma add password-argon2"
+        },
+        {
+          "id": "password-bcrypt",
+          "name": "password-bcrypt",
+          "displayName": "Bcrypt Password",
+          "description": "Bcrypt password hashing",
+          "purpose": "Hash passwords with bcrypt. Well-established and widely supported.",
+          "features": [
+            "Bcrypt algorithm",
+            "Configurable work factor",
+            "Automatic salt generation",
+            "Constant-time verification"
+          ],
+          "usage": "import { hash, compare } from './middleware/passwords/password-bcrypt';\n\nconst hashed = await hash('secret', 12);\nconst valid = await compare('secret', hashed);",
+          "output": "middleware/passwords/password-bcrypt.ts",
+          "dependencies": ["bcrypt"],
+          "command": "npx hanma add password-bcrypt"
+        },
+        {
+          "id": "password-crypto",
+          "name": "password-crypto",
+          "displayName": "Crypto Password",
+          "description": "Node.js crypto PBKDF2 hashing",
+          "purpose": "Hash passwords using Node.js built-in crypto. Zero external dependencies.",
+          "features": [
+            "PBKDF2 algorithm",
+            "No external dependencies",
+            "Configurable iterations",
+            "Timing-safe comparison"
+          ],
+          "usage": "import { hashPassword, verifyPassword } from './middleware/passwords/password-crypto';\n\nconst hash = await hashPassword('secret');\nconst valid = await verifyPassword('secret', hash);",
+          "output": "middleware/passwords/password-crypto.ts",
+          "dependencies": [],
+          "command": "npx hanma add password-crypto"
+        }
+      ]
+    },
+    {
+      "id": "loggers",
+      "title": "Logging",
+      "description": "Request and application logging",
+      "snippets": [
+        {
+          "id": "winston-logger",
+          "name": "winston-logger",
+          "displayName": "Winston Logger",
+          "description": "Structured logging with Winston",
+          "purpose": "Production-grade structured logging. Essential for debugging and observability.",
+          "features": [
+            "Multiple log levels",
+            "JSON formatting",
+            "File and console transports",
+            "Custom metadata"
+          ],
+          "usage": "import { logger } from './middleware/loggers/winston-logger';\n\nlogger.info('User logged in', { userId: 123 });",
+          "output": "middleware/loggers/winston-logger.ts",
+          "dependencies": ["winston"],
+          "command": "npx hanma add winston-logger"
+        },
+        {
+          "id": "routes-logger",
+          "name": "routes-logger",
+          "displayName": "Routes Logger",
+          "description": "HTTP request logging middleware",
+          "purpose": "Log all HTTP requests. Essential for debugging and monitoring traffic.",
+          "features": [
+            "Morgan integration",
+            "Customizable format",
+            "Skip conditions",
+            "Stream to file"
+          ],
+          "usage": "import { requestLogger } from './middleware/loggers/routes-logger';\n\napp.use(requestLogger);",
+          "output": "middleware/loggers/routes-logger.ts",
+          "dependencies": ["morgan"],
+          "command": "npx hanma add routes-logger"
+        }
+      ]
+    },
+    {
+      "id": "utils-middleware",
+      "title": "Utility Middleware",
+      "description": "Common utility middleware",
+      "snippets": [
+        {
+          "id": "error-middleware",
+          "name": "error-middleware",
+          "displayName": "Error Handler",
+          "description": "Global error handling middleware",
+          "purpose": "Centralized error handling for your Express app. Catches all unhandled errors.",
+          "features": [
+            "Global error catching",
+            "Environment-aware responses",
+            "Error logging",
+            "Custom error classes"
+          ],
+          "usage": "import { errorHandler, AppError } from './middleware/error-middleware';\n\n// Must be last middleware\napp.use(errorHandler);\n\n// Throw custom errors\nthrow new AppError('Not found', 404);",
+          "output": "middleware/error-middleware.ts",
+          "dependencies": [],
+          "command": "npx hanma add error-middleware"
+        },
+        {
+          "id": "validation-zod",
+          "name": "validation-zod",
+          "displayName": "Zod Validation",
+          "description": "Request validation with Zod schemas",
+          "purpose": "Validate request body, params, and query with Zod. Type-safe validation.",
+          "features": [
+            "Body validation",
+            "Query and params validation",
+            "Type inference",
+            "Custom error messages"
+          ],
+          "usage": "import { validate } from './middleware/validation-zod';\nimport { z } from 'zod';\n\nconst schema = z.object({ email: z.string().email() });\napp.post('/user', validate(schema), handler);",
+          "output": "middleware/validation-zod.ts",
+          "dependencies": ["zod"],
+          "command": "npx hanma add validation-zod"
+        },
+        {
+          "id": "async-handler",
+          "name": "async-handler",
+          "displayName": "Async Handler",
+          "description": "Async route wrapper for error handling",
+          "purpose": "Wrap async route handlers to catch errors. Eliminates try-catch boilerplate.",
+          "features": [
+            "Automatic error catching",
+            "Promise rejection handling",
+            "Clean route definitions",
+            "Zero dependencies"
+          ],
+          "usage": "import { asyncHandler } from './middleware/utils/async-handler';\n\napp.get('/users', asyncHandler(async (req, res) => {\n  const users = await getUsers();\n  res.json(users);\n}));",
+          "output": "middleware/utils/async-handler.ts",
+          "dependencies": [],
+          "command": "npx hanma add async-handler"
+        },
+        {
+          "id": "cache-control",
+          "name": "cache-control",
+          "displayName": "Cache Control",
+          "description": "HTTP caching headers middleware",
+          "purpose": "Set HTTP caching headers for responses. Improve performance with browser caching.",
+          "features": [
+            "Cache-Control headers",
+            "ETag support",
+            "Conditional requests",
+            "Configurable TTL"
+          ],
+          "usage": "import { cacheControl } from './middleware/utils/cache-control';\n\napp.get('/static/*', cacheControl({ maxAge: 86400 }));",
+          "output": "middleware/utils/cache-control.ts",
+          "dependencies": [],
+          "command": "npx hanma add cache-control"
+        },
+        {
+          "id": "compression",
+          "name": "compression",
+          "displayName": "Compression",
+          "description": "Response compression middleware",
+          "purpose": "Compress responses with gzip/brotli. Reduces bandwidth and improves load times.",
+          "features": [
+            "Gzip compression",
+            "Brotli support",
+            "Threshold configuration",
+            "Content-type filtering"
+          ],
+          "usage": "import { compressionMiddleware } from './middleware/utils/compression';\n\napp.use(compressionMiddleware);",
+          "output": "middleware/utils/compression.ts",
+          "dependencies": ["compression"],
+          "command": "npx hanma add compression"
+        },
+        {
+          "id": "request-id",
+          "name": "request-id",
+          "displayName": "Request ID",
+          "description": "Unique ID for request tracing",
+          "purpose": "Add unique ID to each request. Essential for distributed tracing and debugging.",
+          "features": [
+            "UUID generation",
+            "Header propagation",
+            "Logging integration",
+            "Correlation support"
+          ],
+          "usage": "import { requestId } from './middleware/utils/request-id';\n\napp.use(requestId);\n// Access via req.id or X-Request-Id header",
+          "output": "middleware/utils/request-id.ts",
+          "dependencies": ["uuid"],
+          "command": "npx hanma add request-id"
+        },
+        {
+          "id": "response-time",
+          "name": "response-time",
+          "displayName": "Response Time",
+          "description": "Add X-Response-Time header",
+          "purpose": "Track response times for performance monitoring. Adds X-Response-Time header.",
+          "features": [
+            "Millisecond precision",
+            "Header injection",
+            "Callback support",
+            "Logging integration"
+          ],
+          "usage": "import { responseTime } from './middleware/utils/response-time';\n\napp.use(responseTime);",
+          "output": "middleware/utils/response-time.ts",
+          "dependencies": ["response-time"],
+          "command": "npx hanma add response-time"
+        }
+      ]
+    }
+  ]
+}
