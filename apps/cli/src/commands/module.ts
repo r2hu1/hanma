@@ -1,7 +1,7 @@
 import { Command } from "commander";
 import { getConfig, HanmaConfig } from "../utils/config";
 import { fetchFrameworks, fetchRegistry } from "../utils/registry";
-import { installDependencies } from "../utils/install";
+import { batchInstallDependencies } from "../utils/install";
 import path from "path";
 import fs from "fs-extra";
 import chalk from "chalk";
@@ -16,7 +16,14 @@ import { RegistryItem } from "../schema";
 /**
  * Prompt for framework selection
  */
-async function promptFramework(frameworks: string[]): Promise<string | null> {
+async function promptFramework(
+  frameworks: string[],
+  preselected?: string,
+): Promise<string | null> {
+  if (preselected && frameworks.includes(preselected)) {
+    return preselected;
+  }
+
   const { framework } = await prompts({
     type: "autocomplete",
     name: "framework",
@@ -30,12 +37,19 @@ async function promptFramework(frameworks: string[]): Promise<string | null> {
 /**
  * Prompt for version selection or default to latest
  */
-async function promptVersion(registry: RegistryItem[]): Promise<string> {
+async function promptVersion(
+  registry: RegistryItem[],
+  preselected?: string,
+): Promise<string> {
   const versions = Array.from(
     new Set(
       registry.map((item) => item.version).filter((v): v is string => !!v),
     ),
   );
+
+  if (preselected && versions.includes(preselected)) {
+    return preselected;
+  }
 
   if (versions.length > 1) {
     const { version } = await prompts({
@@ -110,23 +124,46 @@ async function promptCategory(
 }
 
 /**
- * Prompt for module selection from filtered list
+ * Prompt for multi-module selection from filtered list
  */
-async function promptModule(
-  items: RegistryItem[],
-): Promise<RegistryItem | null> {
-  const { module } = await prompts({
-    type: "autocomplete",
-    name: "module",
-    message: "Select a module to add",
+async function promptModules(items: RegistryItem[]): Promise<RegistryItem[]> {
+  const { modules } = await prompts({
+    type: "multiselect",
+    name: "modules",
+    message: "Select modules to add (space to select, enter to confirm)",
     choices: items.map((item) => ({
       title: item.name,
       value: item,
       description: item.description,
     })),
+    hint: "- Space to select. Return to submit",
   });
 
-  return module || null;
+  return modules || [];
+}
+
+/**
+ * Find modules by name from the registry
+ */
+function findModulesByName(
+  names: string[],
+  modules: RegistryItem[],
+): { found: RegistryItem[]; notFound: string[] } {
+  const found: RegistryItem[] = [];
+  const notFound: string[] = [];
+
+  for (const name of names) {
+    const module = modules.find(
+      (m) => m.name.toLowerCase() === name.toLowerCase(),
+    );
+    if (module) {
+      found.push(module);
+    } else {
+      notFound.push(name);
+    }
+  }
+
+  return { found, notFound };
 }
 
 // ============================================================================
@@ -134,46 +171,60 @@ async function promptModule(
 // ============================================================================
 
 /**
- * Install a module's dependencies and write its files
+ * Install multiple modules with batched dependencies
  */
-async function installModule(
-  item: RegistryItem,
+async function installModules(
+  items: RegistryItem[],
   destinationPath: string | undefined,
   config: HanmaConfig,
 ): Promise<void> {
-  console.log(chalk.blue(`\nInstalling module: ${item.name}...`));
+  console.log(chalk.blue(`\nInstalling ${items.length} module(s)...`));
 
-  // Install dependencies
-  if (item.dependencies?.length) {
-    const installSpinner = ora(
-      `Installing dependencies: ${item.dependencies.join(", ")}...`,
-    ).start();
-    await installDependencies(item.dependencies);
-    installSpinner.succeed("Dependencies installed");
+  // Collect all dependencies
+  const allDeps: string[] = [];
+  const allDevDeps: string[] = [];
+  let totalFiles = 0;
+
+  for (const item of items) {
+    if (item.dependencies?.length) {
+      allDeps.push(...item.dependencies);
+    }
+    if (item.devDependencies?.length) {
+      allDevDeps.push(...item.devDependencies);
+    }
+    totalFiles += item.files.length;
   }
 
-  // Install dev dependencies
-  if (item.devDependencies?.length) {
-    const devInstallSpinner = ora(
-      `Installing devDependencies: ${item.devDependencies.join(", ")}...`,
+  // Batch install dependencies
+  if (allDeps.length > 0 || allDevDeps.length > 0) {
+    const installSpinner = ora(
+      `Installing dependencies: ${[...new Set([...allDeps, ...allDevDeps])].join(", ")}...`,
     ).start();
-    await installDependencies(item.devDependencies, true);
-    devInstallSpinner.succeed("Dev dependencies installed");
+    await batchInstallDependencies(allDeps, allDevDeps);
+    installSpinner.succeed("Dependencies installed");
   }
 
   // Write files
   const targetDir = destinationPath || config.componentsPath;
   const writeSpinner = ora("Writing files...").start();
 
-  for (const file of item.files) {
-    const targetPath = path.join(process.cwd(), targetDir, file.name);
-    await fs.ensureDir(path.dirname(targetPath));
-    await fs.writeFile(targetPath, file.content);
+  for (const item of items) {
+    for (const file of item.files) {
+      const targetPath = path.join(process.cwd(), targetDir, file.name);
+      await fs.ensureDir(path.dirname(targetPath));
+      await fs.writeFile(targetPath, file.content);
+    }
   }
 
   writeSpinner.succeed(`Files written to ${targetDir}`);
-  console.log(chalk.green(`\nSuccessfully added module: ${item.name}!`));
-  console.log(chalk.dim(`  ${item.files.length} file(s) installed`));
+
+  const moduleNames = items.map((i) => i.name).join(", ");
+  console.log(
+    chalk.green(
+      `\n✓ Successfully added ${items.length} module(s): ${moduleNames}`,
+    ),
+  );
+  console.log(chalk.dim(`  ${totalFiles} file(s) installed`));
 }
 
 // ============================================================================
@@ -183,16 +234,18 @@ async function installModule(
 export const module = new Command()
   .name("module")
   .alias("mod")
-  .description("Add a multi-file module to your project")
+  .description("Add multi-file module(s) to your project")
   .argument(
-    "[module]",
-    "The module to add (optional, use interactive mode if omitted)",
+    "[modules...]",
+    "Module name(s) to add (optional, use interactive mode if omitted)",
   )
-  .argument(
-    "[path]",
-    "The destination path (optional, defaults to config.componentsPath)",
+  .option("-f, --framework <framework>", "Framework to use")
+  .option("-v, --version <version>", "Version to use")
+  .option(
+    "-p, --path <path>",
+    "Destination path (defaults to config.componentsPath)",
   )
-  .action(async (moduleName, destinationPath) => {
+  .action(async (moduleNames: string[], options) => {
     // 1. Get config
     const config = await getConfig();
     if (!config) {
@@ -214,7 +267,10 @@ export const module = new Command()
       process.exit(1);
     }
 
-    const selectedFramework = await promptFramework(frameworks);
+    const selectedFramework = await promptFramework(
+      frameworks,
+      options.framework,
+    );
     if (!selectedFramework) {
       console.log("Operation cancelled.");
       process.exit(0);
@@ -235,7 +291,7 @@ export const module = new Command()
     }
 
     // 4. Select version
-    const selectedVersion = await promptVersion(registry);
+    const selectedVersion = await promptVersion(registry, options.version);
     if (selectedVersion === "") {
       console.log("Operation cancelled.");
       process.exit(0);
@@ -253,20 +309,43 @@ export const module = new Command()
       process.exit(0);
     }
 
-    // 6. Select category
-    const categoryFiltered = await promptCategory(modules);
-    if (!categoryFiltered) {
-      console.log("Operation cancelled.");
-      process.exit(0);
+    let selectedModules: RegistryItem[] = [];
+
+    // 6. Handle different modes
+    if (moduleNames.length > 0) {
+      // Variadic mode: add specific modules by name
+      const { found, notFound } = findModulesByName(moduleNames, modules);
+
+      if (notFound.length > 0) {
+        console.log(chalk.yellow(`Modules not found: ${notFound.join(", ")}`));
+      }
+
+      if (found.length === 0) {
+        console.log(chalk.red("No valid modules to install."));
+        process.exit(1);
+      }
+
+      console.log(
+        chalk.blue(
+          `Found ${found.length} module(s): ${found.map((m) => m.name).join(", ")}`,
+        ),
+      );
+      selectedModules = found;
+    } else {
+      // Interactive mode: multi-select
+      const categoryFiltered = await promptCategory(modules);
+      if (!categoryFiltered) {
+        console.log("Operation cancelled.");
+        process.exit(0);
+      }
+
+      selectedModules = await promptModules(categoryFiltered);
+      if (selectedModules.length === 0) {
+        console.log("No modules selected.");
+        process.exit(0);
+      }
     }
 
-    // 7. Select module
-    const selectedModule = await promptModule(categoryFiltered);
-    if (!selectedModule) {
-      console.log("Operation cancelled.");
-      process.exit(0);
-    }
-
-    // 8. Install module
-    await installModule(selectedModule, destinationPath, config);
+    // 7. Install modules
+    await installModules(selectedModules, options.path, config);
   });

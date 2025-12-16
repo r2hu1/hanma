@@ -1,10 +1,8 @@
 import {
-  LuFlame,
-  LuZap,
-  LuServer,
   LuArrowRight,
   LuLayers,
 } from "react-icons/lu";
+import { frameworks } from "../data/frameworks.data";
 
 const SupportedFrameworks = () => {
   return (
@@ -24,63 +22,39 @@ const SupportedFrameworks = () => {
         </button>
       </div>
 
+      {/* Data-driven grid */}
       <div className="grid md:grid-cols-3 gap-px bg-border border border-border rounded-2xl overflow-hidden">
-        {/* Express Card */}
-        <div className="bg-background p-8 group hover:bg-surface-hover transition-colors relative">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-gray-500/5 rounded-bl-full -mr-8 -mt-8 transition-all group-hover:bg-gray-500/10"></div>
-          <div className="relative z-10">
-            <div className="w-12 h-12 rounded-lg bg-surface border border-border flex items-center justify-center mb-6 text-foreground">
-              <LuServer size={24} />
-            </div>
-            <h3 className="text-xl font-bold text-foreground mb-2">
-              Express.js
-            </h3>
-            <p className="text-sm text-muted mb-8 min-h-[40px]">
-              The battle-tested standard. Middleware and controllers compatible
-              with Express 4 and 5.
-            </p>
-            <div className="flex items-center gap-2 text-xs text-muted font-mono border-t border-border pt-4">
-              <span className="text-foreground">$</span> npm install
-              hanma-express
-            </div>
-          </div>
-        </div>
+        {frameworks.map((fw) => (
+          <div
+            key={fw.id}
+            className="bg-background p-8 group hover:bg-surface-hover transition-colors relative"
+          >
+            <div
+              className={`absolute top-0 right-0 w-32 h-32 bg-${fw.accent}-500/5 rounded-bl-full -mr-8 -mt-8 transition-all group-hover:bg-${fw.accent}-500/10`}
+            />
 
-        {/* Hono Card */}
-        <div className="bg-background p-8 group hover:bg-surface-hover transition-colors relative">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-orange-500/5 rounded-bl-full -mr-8 -mt-8 transition-all group-hover:bg-orange-500/10"></div>
-          <div className="relative z-10">
-            <div className="w-12 h-12 rounded-lg bg-surface border border-border flex items-center justify-center mb-6 text-orange-500">
-              <LuFlame size={24} />
-            </div>
-            <h3 className="text-xl font-bold text-foreground mb-2">Hono</h3>
-            <p className="text-sm text-muted mb-8 min-h-[40px]">
-              Ultrafast web framework for the Edge. Runs on Cloudflare Workers,
-              Deno, and Bun.
-            </p>
-            <div className="flex items-center gap-2 text-xs text-muted font-mono border-t border-border pt-4">
-              <span className="text-orange-500">$</span> npm install hanma-hono
-            </div>
-          </div>
-        </div>
+            <div className="relative z-10">
+              <div
+                className={`w-12 h-12 rounded-lg bg-background border border-border flex items-center justify-center mb-6 ${fw.iconColor}`}
+              >
+                <fw.icon size={24} />
+              </div>
 
-        {/* Elysia Card */}
-        <div className="bg-background p-8 group hover:bg-surface-hover transition-colors relative">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-pink-500/5 rounded-bl-full -mr-8 -mt-8 transition-all group-hover:bg-pink-500/10"></div>
-          <div className="relative z-10">
-            <div className="w-12 h-12 rounded-lg bg-surface border border-border flex items-center justify-center mb-6 text-pink-500">
-              <LuZap size={24} />
-            </div>
-            <h3 className="text-xl font-bold text-foreground mb-2">Elysia</h3>
-            <p className="text-sm text-muted mb-8 min-h-[40px]">
-              Ergonomic framework for Bun. End-to-end type safety with TypeBox
-              integration.
-            </p>
-            <div className="flex items-center gap-2 text-xs text-muted font-mono border-t border-border pt-4">
-              <span className="text-pink-500">$</span> bun add hanma-elysia
+              <h3 className="text-xl font-bold text-foreground mb-2">
+                {fw.name}
+              </h3>
+
+              <p className="text-sm text-muted mb-8 min-h-[40px]">
+                {fw.description}
+              </p>
+
+              <div className="flex items-center gap-2 text-xs text-muted font-mono border-t border-border pt-4">
+                <span className={fw.command.prefixColor}>$</span>
+                {fw.command.text}
+              </div>
             </div>
           </div>
-        </div>
+        ))}
       </div>
 
       <div className="mt-8 text-center">

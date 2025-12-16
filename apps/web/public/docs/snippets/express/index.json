@@ -1,0 +1,48 @@
+{
+  "framework": "express",
+  "version": "v5",
+  "title": "Express v5 Snippets",
+  "description": "A comprehensive collection of 53 production-ready code snippets for Express.js v5 applications.",
+  "installNote": "Install snippets with: npx hanma add <snippet-name> [snippet-name...] (supports multiple)",
+  "concept": {
+    "whatIsASnippet": "A snippet is a single, self-contained code file that provides a specific utility, middleware, or integration. Snippets are designed to be dropped into your project and customized as needed.",
+    "whenToUseSnippets": [
+      "When you need a specific utility or middleware",
+      "When you want copy-paste code you own and can modify",
+      "When you prefer composition over packages"
+    ],
+    "snippetsVsPackages": {
+      "snippets": "Code you own - copy, paste, modify freely",
+      "packages": "External dependencies - updates managed by maintainers",
+      "benefit": "Snippets give you full control and no dependency bloat"
+    }
+  },
+  "examples": [
+    {
+      "title": "Add a single snippet",
+      "description": "Add the CORS configuration to your project",
+      "command": "npx hanma add cors"
+    },
+    {
+      "title": "Add multiple snippets",
+      "description": "Add several related snippets at once",
+      "command": "npx hanma add cors helmet rate-limiter"
+    },
+    {
+      "title": "Add all middleware",
+      "description": "Add all snippets in a category",
+      "command": "npx hanma add --all --category middleware"
+    },
+    {
+      "title": "Interactive selection",
+      "description": "Use multi-select to choose snippets",
+      "command": "npx hanma add"
+    }
+  ],
+  "categoryFiles": [
+    { "id": "libs", "file": "libs.json", "title": "Libraries", "description": "Core libraries and service integrations" },
+    { "id": "middleware", "file": "middleware.json", "title": "Middleware", "description": "Reusable Express middleware" },
+    { "id": "utils", "file": "utils.json", "title": "Utilities", "description": "Standalone utility functions" },
+    { "id": "routes", "file": "routes.json", "title": "Routes", "description": "Pre-built route handlers" }
+  ]
+}

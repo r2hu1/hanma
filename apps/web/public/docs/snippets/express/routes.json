@@ -1,0 +1,31 @@
+{
+  "id": "routes",
+  "title": "Routes",
+  "description": "Pre-built route handlers",
+  "subcategories": [
+    {
+      "id": "common",
+      "title": "Common Routes",
+      "description": "Standard API routes",
+      "snippets": [
+        {
+          "id": "health-check",
+          "name": "health-check",
+          "displayName": "Health Check Routes",
+          "description": "Liveness and readiness endpoints",
+          "purpose": "Provide health check endpoints for load balancers and Kubernetes. Essential for production deployments.",
+          "features": [
+            "Liveness probe (/health/live)",
+            "Readiness probe (/health/ready)",
+            "Dependency checks",
+            "JSON status response"
+          ],
+          "usage": "import { healthRoutes } from './routes/health-check';\n\napp.use('/health', healthRoutes);\n\n// GET /health/live - Returns 200 if server is running\n// GET /health/ready - Returns 200 if dependencies are ready",
+          "output": "routes/health-check.ts",
+          "dependencies": [],
+          "command": "npx hanma add health-check"
+        }
+      ]
+    }
+  ]
+}

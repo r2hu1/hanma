@@ -4,7 +4,9 @@ import type {
   TabType,
   SnippetFramework,
   TemplatesData,
+  TemplateCategory,
   ModulesData,
+  SnippetCategory,
 } from "../types/docs";
 
 interface UseDocsDataReturn {
@@ -52,18 +54,66 @@ export function useDocsData(): UseDocsDataReturn {
     const fetchData = async () => {
       try {
         if (activeTab === "snippets" && !snippetsData) {
-          const res = await fetch("/docs/snippets/express.json");
-          const data = await res.json();
-          setSnippetsData(data);
-          if (data.categories?.length > 0) {
-            setActiveCategory(data.categories[0].id);
+          const indexRes = await fetch("/docs/snippets/express/index.json");
+          const indexData = await indexRes.json();
+          const categoryPromises = indexData.categoryFiles.map(
+            async (catFile: { id: string; file: string }) => {
+              const res = await fetch(`/docs/snippets/express/${catFile.file}`);
+              return res.json();
+            },
+          );
+          const categories: SnippetCategory[] =
+            await Promise.all(categoryPromises);
+
+          // Merge into SnippetFramework structure
+          const mergedData: SnippetFramework = {
+            framework: indexData.framework,
+            version: indexData.version,
+            title: indexData.title,
+            description: indexData.description,
+            installNote: indexData.installNote,
+            concept: indexData.concept,
+            examples: indexData.examples,
+            categories,
+          };
+
+          setSnippetsData(mergedData);
+          if (categories.length > 0) {
+            setActiveCategory(categories[0].id);
           }
         } else if (activeTab === "templates" && !templatesData) {
-          const res = await fetch("/docs/templates/index.json");
-          const data = await res.json();
-          setTemplatesData(data);
-          if (data.categories?.length > 0) {
-            setActiveCategory(data.categories[0].id);
+          // Fetch from framework-specific directory (express for now)
+          const indexRes = await fetch("/docs/templates/express/index.json");
+          const indexData = await indexRes.json();
+
+          // Fetch all category files in parallel
+          const categoryPromises = indexData.categoryFiles.map(
+            async (catFile: {
+              id: string;
+              file: string;
+              title: string;
+              description: string;
+            }) => {
+              const res = await fetch(
+                `/docs/templates/express/${catFile.file}`,
+              );
+              return res.json();
+            },
+          );
+          const categories: TemplateCategory[] =
+            await Promise.all(categoryPromises);
+
+          // Merge into TemplatesData structure
+          const mergedData: TemplatesData = {
+            title: indexData.title,
+            description: indexData.description,
+            categories,
+            examples: indexData.examples,
+          };
+
+          setTemplatesData(mergedData);
+          if (categories.length > 0) {
+            setActiveCategory(categories[0].id);
           }
         } else if (activeTab === "modules" && !modulesData) {
           const res = await fetch("/docs/modules/index.json");

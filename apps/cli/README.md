@@ -22,12 +22,61 @@ hanma init
 
 This will create a `hanma.json` configuration file.
 
-### Add a Snippet
+### Add Snippets
 
-Add a snippet to your project:
+Add snippets to your project:
 
 ```bash
-hanma add express-v5-cors
+# Interactive multi-select
+hanma add
+
+# Add specific snippets by name
+hanma add cors jwt rate-limiter
+
+# Add all snippets in a category
+hanma add --all --category middleware
+
+# With framework/version flags
+hanma add cors --framework express --version v5
 ```
 
-You can also run `hanma add` without arguments to select from a list.
+### Add Modules
+
+Add multi-file modules to your project:
+
+```bash
+# Interactive multi-select
+hanma module
+
+# Add specific modules by name
+hanma module i18n billing
+hanma mod i18n  # 'mod' is an alias
+```
+
+### Create Project
+
+Scaffold a new project from templates:
+
+```bash
+hanma create my-api --framework express-rest-api --database drizzle-postgres
+```
+
+## Options
+
+### `add` Command Options
+
+| Option | Description |
+|--------|-------------|
+| `-a, --all` | Add all snippets (use with `--category`) |
+| `-c, --category <cat>` | Filter by category |
+| `-f, --framework <fw>` | Framework to use |
+| `-v, --version <ver>` | Version to use |
+| `-p, --path <path>` | Destination path |
+
+### `module` Command Options
+
+| Option | Description |
+|--------|-------------|
+| `-f, --framework <fw>` | Framework to use |
+| `-v, --version <ver>` | Version to use |
+| `-p, --path <path>` | Destination path |

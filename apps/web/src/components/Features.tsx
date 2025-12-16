@@ -1,50 +1,4 @@
-import {
-  LuZap,
-  LuLayers,
-  LuGitBranch,
-  LuCode,
-  LuShieldCheck,
-  LuDatabase,
-} from "react-icons/lu";
-
-const features = [
-  {
-    icon: <LuShieldCheck className="text-foreground" />,
-    title: "Security First",
-    description:
-      "Every snippet is audited for common vulnerabilities (OWASP Top 10) before being published.",
-  },
-  {
-    icon: <LuZap className="text-foreground" />,
-    title: "Zero Dependencies",
-    description:
-      "Code that relies on standard libraries whenever possible to keep your bundle size small.",
-  },
-  {
-    icon: <LuCode className="text-foreground" />,
-    title: "Type Safe",
-    description:
-      "Written in TypeScript, Go, and Python with full type definitions included out of the box.",
-  },
-  {
-    icon: <LuDatabase className="text-foreground" />,
-    title: "Database Agnostic",
-    description:
-      "Adapters for PostgreSQL, MySQL, and MongoDB. Switch databases without rewriting logic.",
-  },
-  {
-    icon: <LuLayers className="text-foreground" />,
-    title: "Modular Design",
-    description:
-      "Composable functions that can be used independently or chained together.",
-  },
-  {
-    icon: <LuGitBranch className="text-foreground" />,
-    title: "Version Controlled",
-    description:
-      "Track changes to Snippets in your own git history. No black-box npm updates.",
-  },
-];
+import { features } from "../data/features.data";
 
 const Features = () => {
   return (
@@ -69,7 +23,7 @@ const Features = () => {
               <ArrowUpRightIcon className="text-muted w-4 h-4" />
             </div>
             <div className="w-10 h-10 bg-surface border border-border rounded-lg flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
-              {feature.icon}
+              <feature.icon className="text-foreground" />
             </div>
             <h3 className="text-lg font-semibold text-foreground mb-3">
               {feature.title}
