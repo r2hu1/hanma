@@ -9,11 +9,11 @@ files:
   - name: libs/sentry.ts
 ---
 import * as Sentry from '@sentry/node';
-import { Express, Request, Response, NextFunction } from 'express';
+import { Express } from 'express';
 
 /**
  * Initialize Sentry
- * Call this before creating your Express app
+ * Call this at the very beginning of your program, before any other imports!
  */
 export const initSentry = () => {
   if (!process.env.SENTRY_DSN) {
@@ -31,10 +31,14 @@ export const initSentry = () => {
     
     // Only send errors in production
     enabled: process.env.NODE_ENV === 'production',
+
+    // Add useful integrations for Express
+    integrations: [
+      // Sentry v8+ automatically adds many integrations
+    ],
     
     // Filter sensitive data
     beforeSend(event) {
-      // Remove sensitive headers
       if (event.request?.headers) {
         delete event.request.headers['authorization'];
         delete event.request.headers['cookie'];
@@ -48,36 +52,15 @@ export const initSentry = () => {
 };
 
 /**
- * Setup Sentry request handler
- * Add this BEFORE your routes
- */
-export const sentryRequestHandler = () => {
-  return Sentry.Handlers.requestHandler({
-    // Include user info if available
-    user: ['id', 'email'],
-  });
-};
-
-/**
- * Setup Sentry tracing handler
- * Add this BEFORE your routes, after requestHandler
- */
-export const sentryTracingHandler = () => {
-  return Sentry.Handlers.tracingHandler();
-};
-
-/**
  * Setup Sentry error handler
- * Add this AFTER your routes, before your error handler
+ * Add this AFTER your routes, but BEFORE any other error handlers
  */
-export const sentryErrorHandler = () => {
-  return Sentry.Handlers.errorHandler({
-    shouldHandleError(error) {
-      // Capture 4xx and 5xx errors
-      const status = (error as any).status || (error as any).statusCode || 500;
-      return status >= 400;
-    },
-  });
+export const setupSentryErrorHandler = (app: Express) => {
+  if (!process.env.SENTRY_DSN || process.env.NODE_ENV !== 'production') {
+    return;
+  }
+
+  Sentry.setupExpressErrorHandler(app);
 };
 
 /**
@@ -117,23 +100,28 @@ export const addBreadcrumb = (message: string, category?: string, data?: Record<
 };
 
 /**
- * Example usage in app.ts:
+ * Example usage in index.ts:
  * 
- * import { initSentry, sentryRequestHandler, sentryTracingHandler, sentryErrorHandler } from './libs/sentry';
- * 
- * // Initialize before app
+ * 1. Initialize first:
+ * import { initSentry } from './libs/sentry';
  * initSentry();
+ * 
+ * 2. Setup app:
+ * import express from 'express';
+ * import { setupSentryErrorHandler } from './libs/sentry';
  * 
  * const app = express();
  * 
- * // Add handlers in order
- * app.use(sentryRequestHandler());
- * app.use(sentryTracingHandler());
+ * // Note: Request and Tracing handlers are now automatic in Sentry v8+ 
+ * // if initSentry is called before app initialization.
  * 
  * // Your routes here
  * app.use('/api', routes);
  * 
- * // Error handler (must be after routes)
- * app.use(sentryErrorHandler());
+ * // 3. Error handler (must be after routes)
+ * setupSentryErrorHandler(app);
+ * 
+ * // Your custom error handler
  * app.use(errorHandler);
  */
+
