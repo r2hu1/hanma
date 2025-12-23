@@ -1,20 +1,22 @@
-import { useState } from "react";
+import { memo } from "react";
 import { CgChevronRight } from "react-icons/cg";
 import type { SnippetDoc } from "../../types/docs";
+import { useUIStore } from "../../stores";
 import { CodeBlock } from "./CodeBlock";
 
 interface SnippetCardProps {
   snippet: SnippetDoc;
 }
 
-export const SnippetCard = ({ snippet }: SnippetCardProps) => {
-  const [expanded, setExpanded] = useState(false);
+const SnippetCardComponent = ({ snippet }: SnippetCardProps) => {
+  const { isCardExpanded, toggleCardExpanded } = useUIStore();
+  const expanded = isCardExpanded(snippet.id);
 
   return (
     <div className="border border-border rounded-xl bg-surface overflow-hidden hover:border-foreground/20 transition-colors">
       <div 
         className="p-6 border-b border-border bg-background cursor-pointer"
-        onClick={() => setExpanded(!expanded)}
+        onClick={() => toggleCardExpanded(snippet.id)}
       >
         <div className="flex items-center justify-between">
           <h3 className="text-xl font-bold text-foreground flex items-center gap-2">
@@ -148,3 +150,5 @@ export const SnippetCard = ({ snippet }: SnippetCardProps) => {
     </div>
   );
 };
+
+export const SnippetCard = memo(SnippetCardComponent);

@@ -1,26 +1,29 @@
-import { useState } from "react";
+import { memo } from "react";
 import { CgChevronRight } from "react-icons/cg";
 import type { Template } from "../../types/docs";
+import { useUIStore } from "../../stores";
 import { CodeBlock } from "./CodeBlock";
 
 interface TemplateCardProps {
   template: Template;
 }
 
-export const TemplateCard = ({ template }: TemplateCardProps) => {
-  const [expanded, setExpanded] = useState(false);
+const TemplateCardComponent = ({ template }: TemplateCardProps) => {
+  const { isCardExpanded, toggleCardExpanded } = useUIStore();
+  const cardId = `template-${template.id}`;
+  const expanded = isCardExpanded(cardId);
 
   return (
     <div className={`border rounded-xl bg-surface overflow-hidden transition-colors ${template.recommended ? 'border-primary' : 'border-border hover:border-foreground/20'}`}>
       <div 
         className="p-6 border-b border-border bg-background cursor-pointer"
-        onClick={() => setExpanded(!expanded)}
+        onClick={() => toggleCardExpanded(cardId)}
       >
         <div className="flex items-center justify-between">
           <h3 className="text-xl font-bold text-foreground flex items-center gap-2">
             {template.name}
             {template.recommended && (
-              <span className="text-xs bg-primary/20 text-primary px-2 py-0.5 rounded-full font-medium">
+              <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full font-normal">
                 Recommended
               </span>
             )}
@@ -35,6 +38,7 @@ export const TemplateCard = ({ template }: TemplateCardProps) => {
 
       {expanded && (
         <div className="p-6 space-y-6">
+          {/* Purpose */}
           {template.purpose && (
             <div>
               <h4 className="text-sm font-semibold text-foreground mb-2">Purpose</h4>
@@ -42,6 +46,7 @@ export const TemplateCard = ({ template }: TemplateCardProps) => {
             </div>
           )}
 
+          {/* Features */}
           {template.features && template.features.length > 0 && (
             <div>
               <h4 className="text-sm font-semibold text-foreground mb-2">Features</h4>
@@ -56,40 +61,27 @@ export const TemplateCard = ({ template }: TemplateCardProps) => {
             </div>
           )}
 
+          {/* Command */}
           <div>
-            <h4 className="text-sm font-semibold text-foreground mb-2">Quick Start</h4>
+            <h4 className="text-sm font-semibold text-foreground mb-2">Create Project</h4>
             <CodeBlock command={template.command} />
           </div>
 
+          {/* Structure */}
           {template.structure && template.structure.length > 0 && (
             <div>
               <h4 className="text-sm font-semibold text-foreground mb-2">Project Structure</h4>
-              <div className="bg-[#0c0c0e] rounded-lg p-4 font-mono text-sm text-zinc-400">
-                {template.structure.map((line, idx) => (
-                  <div key={idx}>{line}</div>
+              <ul className="space-y-1">
+                {template.structure.map((item, idx) => (
+                  <li key={idx} className="text-muted text-sm font-mono">
+                    {item}
+                  </li>
                 ))}
-              </div>
+              </ul>
             </div>
           )}
 
-          {template.envVars && template.envVars.length > 0 && (
-            <div>
-              <h4 className="text-sm font-semibold text-foreground mb-2">Environment Variables</h4>
-              <div className="flex flex-wrap gap-2">
-                {template.envVars.map((env, idx) => {
-                  const envName = typeof env === 'string' ? env : env.name;
-                  const isRequired = typeof env === 'string' ? false : env.required;
-                  return (
-                    <span key={envName ?? idx} className="text-xs bg-surface px-2 py-1 rounded font-mono">
-                      {envName}
-                      {isRequired && <span className="text-red-400 ml-1">*</span>}
-                    </span>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
+          {/* Next Steps */}
           {template.nextSteps && template.nextSteps.length > 0 && (
             <div>
               <h4 className="text-sm font-semibold text-foreground mb-2">Next Steps</h4>
@@ -108,3 +100,5 @@ export const TemplateCard = ({ template }: TemplateCardProps) => {
     </div>
   );
 };
+
+export const TemplateCard = memo(TemplateCardComponent);

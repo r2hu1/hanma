@@ -1,5 +1,5 @@
 // Docs Components - Barrel Export
-export { CodeBlock, CopyButton } from "./CodeBlock";
+export { CodeBlock } from "./CodeBlock";
 export { SnippetCard } from "./SnippetCard";
 export { TemplateCard } from "./TemplateCard";
 export { DocsSidebar } from "./DocsSidebar";

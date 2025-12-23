@@ -1,8 +1,8 @@
-import { useState, useMemo } from "react";
-import { LuBookOpen, LuSearch, LuDownload, LuServer, LuFlame, LuZap, LuPackage, LuChevronDown, LuChevronRight } from "react-icons/lu";
+import { useMemo, memo } from "react";
+import { LuBookOpen, LuSearch, LuServer, LuFlame, LuZap, LuPackage, LuChevronDown, LuChevronRight } from "react-icons/lu";
 import { CgChevronRight } from "react-icons/cg";
-import type { TabType, SnippetFramework, TemplatesData } from "../../types/docs";
-import type { FrameworkType } from "../../hooks/useDocsData";
+import type { TabType, SnippetFramework, TemplatesData, FrameworkType } from "../../types/docs";
+import { useUIStore } from "../../stores";
 import { ThemeToggle } from "../theme/Toggle";
 
 interface DocsSidebarProps {
@@ -17,13 +17,13 @@ interface DocsSidebarProps {
 }
 
 const frameworks = [
-  { id: "express" as FrameworkType, label: "Express", icon: LuServer, description: "Node.js framework" },
-  { id: "hono" as FrameworkType, label: "Hono", icon: LuFlame, description: "Ultra-fast edge framework" },
-  { id: "elysia" as FrameworkType, label: "Elysia", icon: LuZap, description: "Bun framework" },
-  { id: "shared" as FrameworkType, label: "Shared", icon: LuPackage, description: "Framework-agnostic" },
+  { id: "express" as FrameworkType, label: "Express", icon: LuServer },
+  { id: "hono" as FrameworkType, label: "Hono", icon: LuFlame },
+  { id: "elysia" as FrameworkType, label: "Elysia", icon: LuZap },
+  { id: "shared" as FrameworkType, label: "Shared", icon: LuPackage },
 ];
 
-export const DocsSidebar = ({
+const DocsSidebarComponent = ({
   activeTab,
   activeCategory,
   activeFramework,
@@ -33,8 +33,8 @@ export const DocsSidebar = ({
   snippetsData,
   templatesData,
 }: DocsSidebarProps) => {
-  const [searchQuery, setSearchQuery] = useState("");
-  const [expandedFramework, setExpandedFramework] = useState<FrameworkType | null>(activeFramework);
+  // Use Zustand store for UI state
+  const { searchQuery, setSearchQuery, expandedFramework, setExpandedFramework } = useUIStore();
 
   // Filter categories based on search
   const filteredCategories = useMemo(() => {
@@ -53,7 +53,6 @@ export const DocsSidebar = ({
     if (expandedFramework === fw) {
       onFrameworkChange(fw);
     } else {
-      // Expand and switch
       setExpandedFramework(fw);
       onFrameworkChange(fw);
     }
@@ -78,21 +77,6 @@ export const DocsSidebar = ({
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-9 pr-3 py-2 bg-background border border-border rounded-lg text-sm text-foreground placeholder:text-muted focus:outline-none focus:border-primary/50 transition-colors"
           />
-        </div>
-
-        {/* Installation Section */}
-        <div className="mb-4">
-          <button
-            onClick={() => onTabChange("snippets")}
-            className={`w-full text-left px-3 py-2 rounded-lg text-sm flex items-center gap-2 transition-colors ${
-              activeTab === "snippets" && activeCategory === "installation"
-                ? "bg-primary/10 text-primary font-medium"
-                : "text-muted hover:text-foreground hover:bg-surface-hover"
-            }`}
-          >
-            <LuDownload size={16} />
-            Installation
-          </button>
         </div>
 
         {/* Frameworks Section */}
@@ -175,7 +159,7 @@ export const DocsSidebar = ({
           </button>
         </div>
 
-        {/* Templates Categories (when templates tab is active) */}
+        {/* Templates Categories */}
         {activeTab === "templates" && templatesData && (
           <div className="ml-4 mt-1 space-y-0.5 border-l border-border pl-2">
             {templatesData.categories.map((cat) => (
@@ -211,3 +195,5 @@ export const DocsSidebar = ({
     </aside>
   );
 };
+
+export const DocsSidebar = memo(DocsSidebarComponent);
