@@ -1,1 +1,171 @@
-[]
+[
+  {
+    "name": "hono-swagger",
+    "description": "Swagger/OpenAPI documentation for Hono using @hono/swagger-ui",
+    "dependencies": [
+      "hono",
+      "@hono/swagger-ui"
+    ],
+    "files": [
+      {
+        "name": "src/docs/swagger.ts",
+        "path": "src/docs/swagger.ts",
+        "content": "import { swaggerUI } from \"@hono/swagger-ui\";\nimport { Hono } from \"hono\";\n\n/**\n * OpenAPI specification for your API\n */\nexport const openApiSpec = {\n  openapi: \"3.0.0\",\n  info: {\n    title: \"Hono API\",\n    version: \"1.0.0\",\n    description: \"API documentation for your Hono application\",\n  },\n  servers: [\n    {\n      url: process.env.API_URL || \"http://localhost:3000\",\n      description: \"API Server\",\n    },\n  ],\n  paths: {\n    \"/health\": {\n      get: {\n        summary: \"Health check\",\n        responses: {\n          \"200\": {\n            description: \"OK\",\n            content: {\n              \"application/json\": {\n                schema: {\n                  type: \"object\",\n                  properties: {\n                    status: { type: \"string\" },\n                    timestamp: { type: \"string\" },\n                  },\n                },\n              },\n            },\n          },\n        },\n      },\n    },\n    // Add more paths here\n  },\n  components: {\n    securitySchemes: {\n      bearerAuth: {\n        type: \"http\",\n        scheme: \"bearer\",\n        bearerFormat: \"JWT\",\n      },\n    },\n  },\n};\n\n/**\n * Setup Swagger UI routes\n */\nexport const setupSwagger = (app: Hono) => {\n  // Serve OpenAPI spec as JSON\n  app.get(\"/api-docs/json\", (c) => c.json(openApiSpec));\n\n  // Serve Swagger UI\n  app.get(\n    \"/api-docs\",\n    swaggerUI({\n      url: \"/api-docs/json\",\n    })\n  );\n\n  console.log(\"[Swagger] Documentation available at /api-docs\");\n};\n"
+      }
+    ],
+    "version": "v4",
+    "framework": "hono",
+    "category": "docs",
+    "type": "snippet"
+  },
+  {
+    "name": "hono-basic",
+    "description": "Production-ready Hono server with graceful shutdown, structured errors, and health checks",
+    "dependencies": [
+      "hono",
+      "@hono/node-server"
+    ],
+    "devDependencies": [
+      "@types/node"
+    ],
+    "files": [
+      {
+        "name": "src/index.ts",
+        "path": "src/index.ts",
+        "content": "import { Hono } from \"hono\";\nimport { logger } from \"hono/logger\";\nimport { requestId } from \"hono/request-id\";\nimport { serve } from \"@hono/node-server\";\n\nconst app = new Hono();\n\n// Middleware\napp.use(\"*\", requestId());\napp.use(\"*\", logger());\n\n// Health check with details\napp.get(\"/health\", (c) => {\n  return c.json({\n    status: \"ok\",\n    timestamp: new Date().toISOString(),\n    uptime: process.uptime(),\n    memory: process.memoryUsage(),\n  });\n});\n\n// Example route\napp.get(\"/\", (c) => {\n  return c.json({\n    message: \"Hello Hono!\",\n    requestId: c.get(\"requestId\"),\n  });\n});\n\n// 404 handler\napp.notFound((c) => {\n  return c.json(\n    {\n      success: false,\n      message: `Path ${c.req.path} not found`,\n    },\n    404\n  );\n});\n\n// Structured error handling\napp.onError((err, c) => {\n  console.error(`[ERROR] ${err.message}`, { stack: err.stack });\n  \n  const status = \"status\" in err ? (err.status as number) : 500;\n  \n  return c.json(\n    {\n      success: false,\n      message: process.env.NODE_ENV === \"production\" \n        ? \"Internal Server Error\" \n        : err.message,\n      ...(process.env.NODE_ENV !== \"production\" && { stack: err.stack }),\n    },\n    status\n  );\n});\n\nconst port = Number(process.env.PORT) || 3000;\n\n// Start server\nconst server = serve({\n  fetch: app.fetch,\n  port,\n}, (info) => {\n  console.log(`Server is running on http://localhost:${info.port}`);\n});\n\n// Graceful shutdown\nconst shutdown = (signal: string) => {\n  console.log(`\\n${signal} received. Shutting down gracefully...`);\n  server.close(() => {\n    console.log(\"HTTP server closed.\");\n    process.exit(0);\n  });\n\n  // Force shutdown after 10s\n  setTimeout(() => {\n    console.warn(\"Could not close connections in time, forcefully shutting down\");\n    process.exit(1);\n  }, 10000).unref();\n};\n\nprocess.on(\"SIGTERM\", () => shutdown(\"SIGTERM\"));\nprocess.on(\"SIGINT\", () => shutdown(\"SIGINT\"));"
+      }
+    ],
+    "version": "v4",
+    "framework": "hono",
+    "category": "libs/servers",
+    "type": "snippet"
+  },
+  {
+    "name": "hono-cors",
+    "description": "Production-ready CORS middleware with environment-driven configuration",
+    "dependencies": [
+      "hono"
+    ],
+    "files": [
+      {
+        "name": "src/middleware/cors.ts",
+        "path": "src/middleware/cors.ts",
+        "content": "import { cors } from \"hono/cors\";\nimport type { CorsOptions } from \"hono/cors\";\n\n/**\n * Parses environment variables to get allowed origins, methods, and headers.\n * Set these in your .env file:\n * - CORS_ORIGINS=https://example.com,https://app.example.com\n * - CORS_METHODS=GET,POST,PUT,DELETE,OPTIONS\n * - CORS_HEADERS=Content-Type,Authorization\n */\nconst getEnvConfig = () => {\n  const allowedOrigins = (process.env.CORS_ORIGINS ?? \"\")\n    .split(\",\")\n    .map((o) => o.trim())\n    .filter((o) => o.length > 0);\n\n  const allowedMethods = (process.env.CORS_METHODS ?? \"GET,POST,PUT,DELETE,OPTIONS\")\n    .split(\",\")\n    .map((m) => m.trim())\n    .filter((m) => m.length > 0);\n\n  const allowedHeaders = (process.env.CORS_HEADERS ?? \"Content-Type,Authorization\")\n    .split(\",\")\n    .map((h) => h.trim())\n    .filter((h) => h.length > 0);\n\n  return { allowedOrigins, allowedMethods, allowedHeaders };\n};\n\nexport const { allowedOrigins, allowedMethods, allowedHeaders } = getEnvConfig();\n\n/**\n * Creates CORS options based on environment or provided overrides.\n */\nexport const createCorsOptions = (\n  overrides?: Partial<CorsOptions> & {\n    origins?: string[];\n    methods?: string[];\n    headers?: string[];\n  }\n): CorsOptions => {\n  const origins = overrides?.origins ?? allowedOrigins;\n  const methods = overrides?.methods ?? allowedMethods;\n  const headers = overrides?.headers ?? allowedHeaders;\n\n  return {\n    origin: (origin) => {\n      // Allow requests with no origin (mobile apps, curl, same-origin)\n      if (!origin) return origin;\n\n      // If no origins configured, allow all (development mode)\n      if (origins.length === 0) return origin;\n\n      // Check if origin is in allowed list\n      return origins.includes(origin) ? origin : origins[0];\n    },\n    allowMethods: methods,\n    allowHeaders: headers,\n    exposeHeaders: [\"Content-Length\", \"X-Request-Id\"],\n    maxAge: 600,\n    credentials: true,\n    ...overrides,\n  };\n};\n\n/**\n * Validate CORS configuration on startup\n */\nexport const validateCorsConfig = (): boolean => {\n  if (allowedOrigins.length === 0) {\n    console.warn(\n      \"[CORS] No CORS_ORIGINS configured. All origins will be allowed (development mode).\"\n    );\n    return false;\n  }\n  console.log(`[CORS] Allowed origins: ${allowedOrigins.join(\", \")}`);\n  return true;\n};\n\n/**\n * Pre-configured CORS middleware using environment variables\n */\nexport const corsMiddleware = cors(createCorsOptions());\n\n/**\n * Development CORS (allows all origins)\n */\nexport const devCorsMiddleware = cors({\n  origin: \"*\",\n  allowMethods: [\"GET\", \"POST\", \"PUT\", \"DELETE\", \"OPTIONS\"],\n  allowHeaders: [\"Content-Type\", \"Authorization\"],\n  credentials: true,\n});\n\n/**\n * Get appropriate CORS middleware based on environment\n */\nexport const getCorsMiddleware = () => {\n  return process.env.NODE_ENV === \"production\" ? corsMiddleware : devCorsMiddleware;\n};\n"
+      }
+    ],
+    "version": "v4",
+    "framework": "hono",
+    "category": "middleware",
+    "type": "snippet"
+  },
+  {
+    "name": "hono-error-handler",
+    "description": "Global error handling middleware for Hono with structured responses",
+    "dependencies": [
+      "hono"
+    ],
+    "files": [
+      {
+        "name": "src/middleware/error-handler.ts",
+        "path": "src/middleware/error-handler.ts",
+        "content": "import { HTTPException } from \"hono/http-exception\";\nimport type { ErrorHandler } from \"hono\";\n\n/**\n * Application error class for custom errors\n */\nexport class AppError extends Error {\n  constructor(\n    public message: string,\n    public statusCode: number = 500,\n    public code?: string,\n    public details?: unknown\n  ) {\n    super(message);\n    this.name = \"AppError\";\n  }\n}\n\n/**\n * Not Found error\n */\nexport class NotFoundError extends AppError {\n  constructor(resource = \"Resource\") {\n    super(`${resource} not found`, 404, \"NOT_FOUND\");\n  }\n}\n\n/**\n * Validation error\n */\nexport class ValidationError extends AppError {\n  constructor(message: string, details?: unknown) {\n    super(message, 400, \"VALIDATION_ERROR\", details);\n  }\n}\n\n/**\n * Unauthorized error\n */\nexport class UnauthorizedError extends AppError {\n  constructor(message = \"Unauthorized\") {\n    super(message, 401, \"UNAUTHORIZED\");\n  }\n}\n\n/**\n * Forbidden error\n */\nexport class ForbiddenError extends AppError {\n  constructor(message = \"Forbidden\") {\n    super(message, 403, \"FORBIDDEN\");\n  }\n}\n\n/**\n * Global error handler\n */\nexport const errorHandler: ErrorHandler = (err, c) => {\n  console.error(`[ERROR] ${err.message}`, {\n    name: err.name,\n    stack: process.env.NODE_ENV !== \"production\" ? err.stack : undefined,\n  });\n\n  // Handle HTTPException from Hono\n  if (err instanceof HTTPException) {\n    return c.json(\n      {\n        success: false,\n        message: err.message,\n        code: \"HTTP_EXCEPTION\",\n      },\n      err.status\n    );\n  }\n\n  // Handle custom AppError\n  if (err instanceof AppError) {\n    return c.json(\n      {\n        success: false,\n        message: err.message,\n        code: err.code,\n        ...(process.env.NODE_ENV !== \"production\" && { details: err.details }),\n      },\n      err.statusCode as any\n    );\n  }\n\n  // Handle unknown errors\n  return c.json(\n    {\n      success: false,\n      message:\n        process.env.NODE_ENV === \"production\"\n          ? \"Internal Server Error\"\n          : err.message,\n      ...(process.env.NODE_ENV !== \"production\" && { stack: err.stack }),\n    },\n    500\n  );\n};\n\n/**\n * Async handler wrapper to catch errors in route handlers\n */\nexport const asyncHandler = <T>(\n  fn: (c: any) => Promise<T>\n): ((c: any) => Promise<T>) => {\n  return async (c) => {\n    try {\n      return await fn(c);\n    } catch (error) {\n      throw error; // Let errorHandler catch it\n    }\n  };\n};\n"
+      }
+    ],
+    "version": "v4",
+    "framework": "hono",
+    "category": "middleware",
+    "type": "snippet"
+  },
+  {
+    "name": "hono-jwt",
+    "description": "JWT authentication with RBAC and detailed error handling for Hono",
+    "dependencies": [
+      "hono"
+    ],
+    "files": [
+      {
+        "name": "src/middleware/auth.ts",
+        "path": "src/middleware/auth.ts",
+        "content": "import { jwt } from \"hono/jwt\";\nimport { createMiddleware } from \"hono/factory\";\nimport type { Context, Next } from \"hono\";\n\nconst JWT_SECRET = process.env.JWT_SECRET || \"it-is-so-secret\";\n\n/**\n * Standard JWT Middleware\n */\nexport const jwtMiddleware = jwt({\n  secret: JWT_SECRET,\n});\n\n/**\n * Role-Based Access Control (RBAC) Middleware\n */\nexport const checkRole = (roles: string[]) => {\n  return createMiddleware(async (c: Context, next: Next) => {\n    const payload = c.get(\"jwtPayload\");\n    \n    if (!payload || !payload.role || !roles.includes(payload.role)) {\n      return c.json({\n        success: false,\n        message: \"Forbidden: Insufficient permissions\",\n      }, 403);\n    }\n    \n    await next();\n  });\n};\n\n/**\n * Usage in app:\n * \n * app.use(\"/api/protected/*\", jwtMiddleware);\n * app.get(\"/api/admin\", checkRole([\"admin\"]), (c) => c.text(\"Admin only\"));\n */\n"
+      }
+    ],
+    "version": "v4",
+    "framework": "hono",
+    "category": "middleware",
+    "type": "snippet"
+  },
+  {
+    "name": "hono-logger",
+    "description": "Structured request/response logger for Hono with timing and requestId",
+    "dependencies": [
+      "hono"
+    ],
+    "files": [
+      {
+        "name": "src/middleware/logger.ts",
+        "path": "src/middleware/logger.ts",
+        "content": "import { logger } from \"hono/logger\";\nimport { createMiddleware } from \"hono/factory\";\n\n/**\n * Custom logger that includes request details and timing\n */\nexport const customLogger = createMiddleware(async (c, next) => {\n  const start = Date.now();\n  const method = c.req.method;\n  const path = c.req.path;\n  \n  await next();\n  \n  const ms = Date.now() - start;\n  const status = c.res.status;\n  \n  const logMessage = `[HONO] ${method} ${path} - ${status} (${ms}ms)`;\n  \n  if (status >= 500) {\n    console.error(`\\x1b[31m${logMessage}\\x1b[0m`);\n  } else if (status >= 400) {\n    console.warn(`\\x1b[33m${logMessage}\\x1b[0m`);\n  } else {\n    console.log(`\\x1b[32m${logMessage}\\x1b[0m`);\n  }\n});\n\n/**\n * Standard Hono logger integration\n */\nexport const setupLogger = (app: any) => {\n  app.use(\"*\", logger());\n  app.use(\"*\", customLogger);\n};\n"
+      }
+    ],
+    "version": "v4",
+    "framework": "hono",
+    "category": "middleware",
+    "type": "snippet"
+  },
+  {
+    "name": "hono-rate-limiter",
+    "description": "Rate limiting middleware for Hono with default, auth, and API presets",
+    "dependencies": [
+      "hono"
+    ],
+    "files": [
+      {
+        "name": "src/middleware/rate-limiter.ts",
+        "path": "src/middleware/rate-limiter.ts",
+        "content": "import { createMiddleware } from \"hono/factory\";\nimport type { Context, Next } from \"hono\";\n\ninterface RateLimitStore {\n  [key: string]: { count: number; resetTime: number };\n}\n\nconst store: RateLimitStore = {};\n\ninterface RateLimitOptions {\n  windowMs: number;\n  max: number;\n  message?: string;\n  keyGenerator?: (c: Context) => string;\n  skipSuccessfulRequests?: boolean;\n}\n\n/**\n * Creates a rate limiter middleware\n */\nexport const createRateLimiter = (options: RateLimitOptions) => {\n  const {\n    windowMs,\n    max,\n    message = \"Too many requests, please try again later.\",\n    keyGenerator = (c) =>\n      c.req.header(\"x-forwarded-for\")?.split(\",\")[0]?.trim() ||\n      c.req.header(\"x-real-ip\") ||\n      \"unknown\",\n    skipSuccessfulRequests = false,\n  } = options;\n\n  return createMiddleware(async (c: Context, next: Next) => {\n    const key = keyGenerator(c);\n    const now = Date.now();\n\n    // Initialize or reset if window expired\n    if (!store[key] || now > store[key].resetTime) {\n      store[key] = { count: 0, resetTime: now + windowMs };\n    }\n\n    // Check if limit exceeded\n    if (store[key].count >= max) {\n      c.header(\"X-RateLimit-Limit\", String(max));\n      c.header(\"X-RateLimit-Remaining\", \"0\");\n      c.header(\"X-RateLimit-Reset\", String(Math.ceil(store[key].resetTime / 1000)));\n      c.header(\"Retry-After\", String(Math.ceil((store[key].resetTime - now) / 1000)));\n\n      return c.json({ success: false, message }, 429);\n    }\n\n    // Increment counter before request\n    store[key].count++;\n\n    // Set rate limit headers\n    c.header(\"X-RateLimit-Limit\", String(max));\n    c.header(\"X-RateLimit-Remaining\", String(max - store[key].count));\n    c.header(\"X-RateLimit-Reset\", String(Math.ceil(store[key].resetTime / 1000)));\n\n    await next();\n\n    // Decrement counter for successful requests if configured\n    if (skipSuccessfulRequests && c.res.status < 400) {\n      store[key].count = Math.max(0, store[key].count - 1);\n    }\n  });\n};\n\n/**\n * Default rate limiter: 100 requests per 15 minutes\n */\nexport const defaultLimiter = createRateLimiter({\n  windowMs: 15 * 60 * 1000,\n  max: 100,\n});\n\n/**\n * Auth rate limiter: 5 attempts per 15 minutes (for login/signup)\n */\nexport const authLimiter = createRateLimiter({\n  windowMs: 15 * 60 * 1000,\n  max: 5,\n  message: \"Too many login attempts, please try again after 15 minutes.\",\n  skipSuccessfulRequests: true,\n});\n\n/**\n * API rate limiter: 1000 requests per hour (for API consumers)\n */\nexport const apiLimiter = createRateLimiter({\n  windowMs: 60 * 60 * 1000,\n  max: 1000,\n  message: \"API rate limit exceeded. Please try again later.\",\n  keyGenerator: (c) =>\n    c.req.header(\"x-api-key\") ||\n    c.req.header(\"x-forwarded-for\")?.split(\",\")[0]?.trim() ||\n    \"unknown\",\n});\n\n/**\n * Strict limiter: 10 requests per minute (for sensitive endpoints)\n */\nexport const strictLimiter = createRateLimiter({\n  windowMs: 60 * 1000,\n  max: 10,\n  message: \"Rate limit exceeded for this endpoint.\",\n});\n"
+      }
+    ],
+    "version": "v4",
+    "framework": "hono",
+    "category": "middleware",
+    "type": "snippet"
+  },
+  {
+    "name": "hono-security",
+    "description": "Security headers middleware for Hono similar to Helmet",
+    "dependencies": [
+      "hono"
+    ],
+    "files": [
+      {
+        "name": "src/middleware/security.ts",
+        "path": "src/middleware/security.ts",
+        "content": "import { secureHeaders } from \"hono/secure-headers\";\nimport { Hono } from \"hono\";\n\n/**\n * Production security headers configuration\n */\nexport const productionSecurity = secureHeaders({\n  contentSecurityPolicy: {\n    defaultSrc: [\"'self'\"],\n    scriptSrc: [\"'self'\", \"https://trusted.cdn.com\"],\n    styleSrc: [\"'self'\", \"'unsafe-inline'\"],\n    imgSrc: [\"'self'\", \"data:\", \"https:\"],\n    connectSrc: [\"'self'\", \"https://api.trusted.com\"],\n    fontSrc: [\"'self'\"],\n    objectSrc: [\"'none'\"],\n    mediaSrc: [\"'self'\"],\n    frameSrc: [\"'none'\"],\n    baseUri: [\"'self'\"],\n    formAction: [\"'self'\"],\n    frameAncestors: [\"'none'\"],\n    upgradeInsecureRequests: [],\n  },\n  strictTransportSecurity: \"max-age=31536000; includeSubDomains; preload\",\n  xFrameOptions: \"DENY\",\n  xContentTypeOptions: \"nosniff\",\n  referrerPolicy: \"strict-origin-when-cross-origin\",\n  xXssProtection: \"1; mode=block\",\n});\n\n/**\n * Development security headers (relaxed)\n */\nexport const developmentSecurity = secureHeaders({\n  contentSecurityPolicy: false,\n});\n\n/**\n * Setup security headers based on environment\n */\nexport const setupSecurity = (app: Hono) => {\n  const isProd = process.env.NODE_ENV === \"production\";\n  app.use(\"*\", isProd ? productionSecurity : developmentSecurity);\n};\n"
+      }
+    ],
+    "version": "v4",
+    "framework": "hono",
+    "category": "middleware",
+    "type": "snippet"
+  },
+  {
+    "name": "hono-zod",
+    "description": "Request validation for Hono with clear error formatting and examples",
+    "dependencies": [
+      "hono",
+      "@hono/zod-validator",
+      "zod"
+    ],
+    "files": [
+      {
+        "name": "src/middleware/validator.ts",
+        "path": "src/middleware/validator.ts",
+        "content": "import { z } from \"zod\";\nimport { zValidator } from \"@hono/zod-validator\";\nimport type { Context } from \"hono\";\n\n/**\n * Generic error formatter for Zod validation failures\n */\nexport const formatZodError = (result: any, c: Context) => {\n  if (!result.success) {\n    return c.json(\n      {\n        success: false,\n        message: \"Validation failed\",\n        errors: result.error.flatten().fieldErrors,\n      },\n      400\n    );\n  }\n};\n\n/**\n * Example: JSON Body Validation\n */\nexport const createUserSchema = z.object({\n  name: z.string().min(2),\n  email: z.string().email(),\n  password: z.string().min(8),\n});\n\nexport const validateCreateUser = zValidator(\"json\", createUserSchema, formatZodError);\n\n/**\n * Example: Query Parameter Validation\n */\nexport const paginationSchema = z.object({\n  page: z.string().optional().transform(Number).default(\"1\"),\n  limit: z.string().optional().transform(Number).default(\"10\"),\n});\n\nexport const validatePagination = zValidator(\"query\", paginationSchema, formatZodError);\n\n/**\n * Example: URL Parameter Validation\n */\nexport const idParamSchema = z.object({\n  id: z.string().uuid(\"Invalid ID format\"),\n});\n\nexport const validateIdParam = zValidator(\"param\", idParamSchema, formatZodError);\n"
+      }
+    ],
+    "version": "v4",
+    "framework": "hono",
+    "category": "middleware",
+    "type": "snippet"
+  }
+]
