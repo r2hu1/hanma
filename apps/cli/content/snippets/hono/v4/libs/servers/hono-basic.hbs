@@ -1,0 +1,96 @@
+---
+name: hono-basic
+description: Production-ready Hono server with graceful shutdown, structured errors, and health checks
+dependencies:
+  - hono
+  - "@hono/node-server"
+devDependencies:
+  - "@types/node"
+files:
+  - name: src/index.ts
+---
+import { Hono } from "hono";
+import { logger } from "hono/logger";
+import { requestId } from "hono/request-id";
+import { serve } from "@hono/node-server";
+
+const app = new Hono();
+
+// Middleware
+app.use("*", requestId());
+app.use("*", logger());
+
+// Health check with details
+app.get("/health", (c) => {
+  return c.json({
+    status: "ok",
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    memory: process.memoryUsage(),
+  });
+});
+
+// Example route
+app.get("/", (c) => {
+  return c.json({
+    message: "Hello Hono!",
+    requestId: c.get("requestId"),
+  });
+});
+
+// 404 handler
+app.notFound((c) => {
+  return c.json(
+    {
+      success: false,
+      message: `Path ${c.req.path} not found`,
+    },
+    404
+  );
+});
+
+// Structured error handling
+app.onError((err, c) => {
+  console.error(`[ERROR] ${err.message}`, { stack: err.stack });
+  
+  const status = "status" in err ? (err.status as number) : 500;
+  
+  return c.json(
+    {
+      success: false,
+      message: process.env.NODE_ENV === "production" 
+        ? "Internal Server Error" 
+        : err.message,
+      ...(process.env.NODE_ENV !== "production" && { stack: err.stack }),
+    },
+    status
+  );
+});
+
+const port = Number(process.env.PORT) || 3000;
+
+// Start server
+const server = serve({
+  fetch: app.fetch,
+  port,
+}, (info) => {
+  console.log(`Server is running on http://localhost:${info.port}`);
+});
+
+// Graceful shutdown
+const shutdown = (signal: string) => {
+  console.log(`\n${signal} received. Shutting down gracefully...`);
+  server.close(() => {
+    console.log("HTTP server closed.");
+    process.exit(0);
+  });
+
+  // Force shutdown after 10s
+  setTimeout(() => {
+    console.warn("Could not close connections in time, forcefully shutting down");
+    process.exit(1);
+  }, 10000).unref();
+};
+
+process.on("SIGTERM", () => shutdown("SIGTERM"));
+process.on("SIGINT", () => shutdown("SIGINT"));

@@ -1,0 +1,59 @@
+---
+name: hono-zod
+description: Request validation for Hono with clear error formatting and examples
+dependencies:
+  - hono
+  - "@hono/zod-validator"
+  - zod
+files:
+  - name: src/middleware/validator.ts
+---
+import { z } from "zod";
+import { zValidator } from "@hono/zod-validator";
+import type { Context } from "hono";
+
+/**
+ * Generic error formatter for Zod validation failures
+ */
+export const formatZodError = (result: any, c: Context) => {
+  if (!result.success) {
+    return c.json(
+      {
+        success: false,
+        message: "Validation failed",
+        errors: result.error.flatten().fieldErrors,
+      },
+      400
+    );
+  }
+};
+
+/**
+ * Example: JSON Body Validation
+ */
+export const createUserSchema = z.object({
+  name: z.string().min(2),
+  email: z.string().email(),
+  password: z.string().min(8),
+});
+
+export const validateCreateUser = zValidator("json", createUserSchema, formatZodError);
+
+/**
+ * Example: Query Parameter Validation
+ */
+export const paginationSchema = z.object({
+  page: z.string().optional().transform(Number).default("1"),
+  limit: z.string().optional().transform(Number).default("10"),
+});
+
+export const validatePagination = zValidator("query", paginationSchema, formatZodError);
+
+/**
+ * Example: URL Parameter Validation
+ */
+export const idParamSchema = z.object({
+  id: z.string().uuid("Invalid ID format"),
+});
+
+export const validateIdParam = zValidator("param", idParamSchema, formatZodError);
