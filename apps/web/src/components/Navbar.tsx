@@ -1,31 +1,17 @@
+import { useEffect, memo } from "react";
 import { LuGithub, LuMoon, LuSun } from "react-icons/lu";
 import Logo from "./Logo";
-import { useTheme } from "./ThemeContext";
+import { useTheme } from "./theme/ThemeContext";
 import { Link } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { useGithubStore } from "../stores";
 
-const Navbar = () => {
+const NavbarComponent = () => {
   const { theme, toggleTheme } = useTheme();
-  const [stars, setStars] = useState<number | null>(null);
+  const { stars, fetchStats } = useGithubStore();
 
   useEffect(() => {
-    const fetchStars = async () => {
-      try {
-        const res = await fetch(
-          "https://api.github.com/repos/itstheanurag/hanma"
-        );
-
-        if (!res.ok) return;
-
-        const data = await res.json();
-        setStars(data.stargazers_count);
-      } catch (err) {
-        console.error("Failed to fetch GitHub stars", err);
-      }
-    };
-
-    fetchStars();
-  }, []);
+    fetchStats();
+  }, [fetchStats]);
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 border-b border-border bg-background/80 backdrop-blur-md">
@@ -48,7 +34,7 @@ const Navbar = () => {
             className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full bg-surface border border-border text-xs font-medium text-muted hover:text-foreground transition-colors"
           >
             <LuGithub size={14} />
-            <span>{stars ?? "—"} Stars</span>
+            <span>{stars} Stars</span>
           </a>
 
           <button
@@ -71,4 +57,4 @@ const Navbar = () => {
   );
 };
 
-export default Navbar;
+export default memo(NavbarComponent);

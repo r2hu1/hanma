@@ -1,47 +1,34 @@
-import { useState } from "react";
-import { CgCheck, CgCopy } from "react-icons/cg";
+import { memo } from "react";
+import { LuCopy, LuCheck } from "react-icons/lu";
+import { useUIStore } from "../../stores";
 
-interface CopyButtonProps {
-  text: string;
+interface CodeBlockProps {
+  command: string;
 }
 
-export const CopyButton = ({ text }: CopyButtonProps) => {
-  const [copied, setCopied] = useState(false);
+const CodeBlockComponent = ({ command }: CodeBlockProps) => {
+  const { setCopied, isCopied } = useUIStore();
+  const copied = isCopied(command);
 
-  const handleCopy = () => {
-    navigator.clipboard.writeText(text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  const handleCopy = async () => {
+    await navigator.clipboard.writeText(command);
+    setCopied(command);
   };
 
   return (
-    <button
-      onClick={handleCopy}
-      className="text-zinc-500 hover:text-white transition-colors flex-shrink-0"
-      title="Copy to clipboard"
-    >
-      {copied ? (
-        <CgCheck size={16} className="text-green-500" />
-      ) : (
-        <CgCopy size={16} />
-      )}
-    </button>
+    <div className="bg-neutral-100 dark:bg-neutral-900 border border-border rounded-lg overflow-hidden flex items-center justify-between group">
+      <pre className="p-4 text-sm text-neutral-800 dark:text-neutral-200 overflow-x-auto flex-1">
+        <code>{command}</code>
+      </pre>
+      <button
+        onClick={handleCopy}
+        className="p-4 text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300 transition-colors"
+        aria-label="Copy to clipboard"
+      >
+        {copied ? <LuCheck size={16} className="text-green-500" /> : <LuCopy size={16} />}
+      </button>
+    </div>
   );
 };
 
-interface CodeBlockProps {
-  code?: string;
-  command?: string;
-}
-
-export const CodeBlock = ({ code, command }: CodeBlockProps) => (
-  <div className="bg-[#0c0c0e] rounded-lg overflow-hidden">
-    <div className="p-4 flex items-center justify-between gap-4">
-      <div className="font-mono text-sm text-zinc-300 overflow-x-auto whitespace-pre-wrap">
-        {command && <span className="text-green-500 mr-2">$</span>}
-        {command || code}
-      </div>
-      <CopyButton text={command || code || ""} />
-    </div>
-  </div>
-);
+export const CodeBlock = memo(CodeBlockComponent);

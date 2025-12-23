@@ -1,0 +1,188 @@
+---
+name: hono-deno
+description: Production-ready Hono server for Deno runtime with security, typing, and observability
+dependencies: []
+files:
+  - name: src/index.ts
+---
+import { Hono } from "https://deno.land/x/hono/mod.ts";
+import { logger } from "https://deno.land/x/hono/middleware.ts";
+import { requestId } from "https://deno.land/x/hono/middleware.ts";
+import { cors } from "https://deno.land/x/hono/middleware.ts";
+import { secureHeaders } from "https://deno.land/x/hono/middleware.ts";
+import { timing } from "https://deno.land/x/hono/middleware.ts";
+
+// Environment configuration
+const config = {
+  port: Number(Deno.env.get("PORT")) || 3000,
+  env: Deno.env.get("DENO_ENV") || "development",
+  corsOrigins: Deno.env.get("CORS_ORIGINS")?.split(",") || ["*"],
+};
+
+// Application type
+type AppEnv = {
+  Variables: {
+    requestId: string;
+    startTime: number;
+  };
+};
+
+const app = new Hono<AppEnv>();
+
+// Security and observability middleware
+app.use("*", secureHeaders());
+app.use("*", timing());
+app.use("*", requestId());
+app.use("*", logger());
+app.use("*", cors({
+  origin: config.corsOrigins,
+  allowMethods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+  allowHeaders: ["Content-Type", "Authorization", "X-Request-ID"],
+  exposeHeaders: ["X-Request-ID", "X-Response-Time"],
+  maxAge: 86400,
+  credentials: true,
+}));
+
+// Request timing
+app.use("*", async (c, next) => {
+  c.set("startTime", Date.now());
+  await next();
+});
+
+// Health check endpoint
+app.get("/health", (c) => {
+  const memory = Deno.memoryUsage();
+  
+  return c.json({
+    status: "healthy",
+    timestamp: new Date().toISOString(),
+    runtime: "deno",
+    version: Deno.version.deno,
+    typescript: Deno.version.typescript,
+    v8: Deno.version.v8,
+    memory: {
+      heapUsed: formatBytes(memory.heapUsed),
+      heapTotal: formatBytes(memory.heapTotal),
+      rss: formatBytes(memory.rss),
+    },
+  });
+});
+
+// Readiness check
+app.get("/ready", (c) => {
+  return c.json({ ready: true });
+});
+
+// Liveness check
+app.get("/live", (c) => c.text("OK"));
+
+// Example route
+app.get("/", (c) => {
+  return c.json({
+    message: "Hello from Deno!",
+    requestId: c.get("requestId"),
+    environment: config.env,
+  });
+});
+
+// 404 handler
+app.notFound((c) => {
+  return c.json(
+    {
+      success: false,
+      error: {
+        code: "NOT_FOUND",
+        message: `Path ${c.req.method} ${c.req.path} not found`,
+      },
+      requestId: c.get("requestId"),
+    },
+    404
+  );
+});
+
+// Global error handler
+app.onError((err, c) => {
+  const requestId = c.get("requestId") || "unknown";
+  const status = "status" in err ? (err.status as number) : 500;
+  
+  // Structured logging
+  console.error(JSON.stringify({
+    level: "error",
+    message: err.message,
+    stack: err.stack,
+    requestId,
+    path: c.req.path,
+    method: c.req.method,
+    timestamp: new Date().toISOString(),
+  }));
+  
+  return c.json(
+    {
+      success: false,
+      error: {
+        code: status === 500 ? "INTERNAL_ERROR" : "REQUEST_ERROR",
+        message: config.env === "production" 
+          ? "An unexpected error occurred" 
+          : err.message,
+      },
+      requestId,
+    },
+    status
+  );
+});
+
+// Utility function
+function formatBytes(bytes: number): string {
+  const units = ["B", "KB", "MB", "GB"];
+  let i = 0;
+  while (bytes >= 1024 && i < units.length - 1) {
+    bytes /= 1024;
+    i++;
+  }
+  return `${bytes.toFixed(2)} ${units[i]}`;
+}
+
+// Abort controller for graceful shutdown
+const abortController = new AbortController();
+
+// Start server
+Deno.serve(
+  {
+    port: config.port,
+    signal: abortController.signal,
+    onListen: ({ port, hostname }) => {
+      console.log(JSON.stringify({
+        level: "info",
+        message: "Server started",
+        hostname,
+        port,
+        environment: config.env,
+        timestamp: new Date().toISOString(),
+      }));
+    },
+  },
+  app.fetch
+);
+
+// Graceful shutdown
+const shutdown = (signal: string) => {
+  console.log(JSON.stringify({
+    level: "info",
+    message: `${signal} received, shutting down gracefully`,
+    timestamp: new Date().toISOString(),
+  }));
+  
+  abortController.abort();
+  
+  setTimeout(() => {
+    console.log(JSON.stringify({
+      level: "info",
+      message: "Server stopped",
+      timestamp: new Date().toISOString(),
+    }));
+    Deno.exit(0);
+  }, 5000);
+};
+
+Deno.addSignalListener("SIGTERM", () => shutdown("SIGTERM"));
+Deno.addSignalListener("SIGINT", () => shutdown("SIGINT"));

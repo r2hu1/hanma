@@ -1,0 +1,81 @@
+name: Snippet Request
+description: Request a new code snippet
+title: "[Snippet]: "
+labels: ["snippet-request"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Request a new snippet for Hanma. Please provide details below.
+
+  - type: input
+    id: snippet-name
+    attributes:
+      label: Snippet Name
+      description: Suggested name for the snippet
+      placeholder: "rate-limiter-redis"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: framework
+    attributes:
+      label: Framework
+      options:
+        - Express
+        - Hono
+        - Elysia
+        - Shared (framework-agnostic)
+    validations:
+      required: true
+
+  - type: dropdown
+    id: category
+    attributes:
+      label: Category
+      options:
+        - Middleware
+        - Authentication
+        - Database
+        - Uploads
+        - Mailers
+        - Validation
+        - Logging
+        - Error Handling
+        - Security
+        - Utilities
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: What should this snippet do?
+    validations:
+      required: true
+
+  - type: textarea
+    id: use-case
+    attributes:
+      label: Use Case
+      description: When would developers use this snippet?
+    validations:
+      required: true
+
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: Expected Dependencies
+      description: What npm packages would this snippet need?
+      placeholder: |
+        - redis
+        - ioredis
+
+  - type: textarea
+    id: example
+    attributes:
+      label: Example Code (Optional)
+      description: If you have example code or reference implementations, share them here.
+      render: typescript

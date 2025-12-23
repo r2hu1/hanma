@@ -136,6 +136,7 @@ export interface ModulesData {
 }
 
 export type TabType = "snippets" | "templates" | "modules";
+export type FrameworkType = "express" | "hono" | "elysia" | "shared";
 
 export interface DocsState {
   activeTab: TabType;

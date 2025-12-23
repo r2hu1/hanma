@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, memo } from "react";
 import { motion, useSpring, useTransform } from "motion/react";
-import { baseStats, githubStats } from "../data/stats.data";
+import { baseStats } from "../data/stats.data";
+import { useGithubStore } from "../stores";
 
 function Counter({ value }: { value: number }) {
   const spring = useSpring(0, { mass: 0.8, stiffness: 75, damping: 15 });
@@ -16,34 +17,12 @@ function Counter({ value }: { value: number }) {
   return <motion.span>{display}</motion.span>;
 }
 
-export function Stats() {
-  const [stars, setStars] = useState(githubStats.defaultStars);
-  const [contributors, setContributors] = useState(githubStats.defaultContributors);
+const StatsComponent = () => {
+  const { stars, contributors, fetchStats } = useGithubStore();
 
   useEffect(() => {
-    // Fetch GitHub Stars
-    fetch(`https://api.github.com/repos/${githubStats.repo}`)
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.stargazers_count) setStars(data.stargazers_count);
-      })
-      .catch((err) => console.error("Failed to fetch stars", err));
-
-    // Fetch Contributors (simple count of first page for now)
-    fetch(
-      `https://api.github.com/repos/${githubStats.repo}/contributors?per_page=1&anon=true`,
-    )
-      .then((_) => {
-        return fetch(
-          `https://api.github.com/repos/${githubStats.repo}/contributors?per_page=100&anon=true`,
-        );
-      })
-      .then((res) => res.json())
-      .then((data) => {
-        if (Array.isArray(data)) setContributors(data.length);
-      })
-      .catch((err) => console.error("Failed to fetch contributors", err));
-  }, []);
+    fetchStats();
+  }, [fetchStats]);
 
   const stats = [
     ...baseStats.map((s) => ({ 
@@ -82,4 +61,6 @@ export function Stats() {
       </div>
     </div>
   );
-}
+};
+
+export const Stats = memo(StatsComponent);
