@@ -1,12 +1,12 @@
 import { memo, useCallback, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { useDocsStore } from "../stores/docsStore";
+import { useDocsStore } from "@/stores/docsStore";
 import {
   DocsSidebar,
   SnippetsView,
   TemplatesView,
   ModulesView,
-} from "../components/docs";
+} from "@/components/docs";
 
 // Memoized sidebar to prevent re-renders when only content changes
 const MemoizedSidebar = memo(DocsSidebar);
@@ -15,26 +15,32 @@ const MemoizedSidebar = memo(DocsSidebar);
 const ContentLoading = () => (
   <div className="flex items-center justify-center py-20">
     <div className="flex flex-col items-center gap-4">
-      <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+      <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
       <p className="text-muted">Loading...</p>
     </div>
   </div>
 );
 
+// Derive tab purely from URL (single source of truth)
+const getTabFromPath = (pathname: string) => {
+  if (pathname.startsWith("/docs/templates")) return "templates";
+  if (pathname.startsWith("/docs/modules")) return "modules";
+  return "snippets";
+};
+
 const Docs = () => {
   const location = useLocation();
   const navigate = useNavigate();
 
-  // Use Zustand store
+  const activeTab = getTabFromPath(location.pathname);
+
   const {
-    activeTab,
     activeCategory,
     activeFramework,
     snippetsData,
     templatesData,
     modulesData,
     loading,
-    setActiveTab,
     setActiveCategory,
     setActiveFramework,
     fetchSnippetsData,
@@ -42,36 +48,37 @@ const Docs = () => {
     fetchModulesData,
   } = useDocsStore();
 
-  // Determine active tab from URL
-  useEffect(() => {
-    const path = location.pathname.replace("/docs", "").replace(/^\//, "");
-    if (path.startsWith("templates")) {
-      setActiveTab("templates");
-    } else if (path.startsWith("modules")) {
-      setActiveTab("modules");
-    } else {
-      setActiveTab("snippets");
-    }
-  }, [location.pathname, setActiveTab]);
-
   // Fetch data based on active tab
   useEffect(() => {
     if (activeTab === "snippets") {
       fetchSnippetsData(activeFramework);
-    } else if (activeTab === "templates") {
+    }
+
+    if (activeTab === "templates") {
       fetchTemplatesData();
-    } else if (activeTab === "modules") {
+    }
+
+    if (activeTab === "modules") {
       fetchModulesData();
     }
-  }, [activeTab, activeFramework, fetchSnippetsData, fetchTemplatesData, fetchModulesData]);
+  }, [
+    activeTab,
+    activeFramework,
+    fetchSnippetsData,
+    fetchTemplatesData,
+    fetchModulesData,
+  ]);
 
-  // Stable callback references
+
+  useEffect(() => {
+    setActiveCategory("");
+  }, [activeTab, setActiveCategory]);
+
   const handleTabChange = useCallback(
     (tab: "snippets" | "templates" | "modules") => {
-      setActiveTab(tab);
-      navigate(`/docs/${tab === "snippets" ? "" : tab}`);
+      navigate(tab === "snippets" ? "/docs" : `/docs/${tab}`);
     },
-    [navigate, setActiveTab]
+    [navigate]
   );
 
   const handleFrameworkChange = useCallback(
@@ -90,7 +97,7 @@ const Docs = () => {
 
   return (
     <div className="min-h-screen bg-background flex flex-col md:flex-row">
-      {/* Sidebar - always visible, never shows loading state */}
+      {/* Sidebar */}
       <MemoizedSidebar
         activeTab={activeTab}
         activeCategory={activeCategory}
@@ -102,24 +109,28 @@ const Docs = () => {
         templatesData={templatesData}
       />
 
-      {/* Main Content - loading only affects this area */}
+      {/* Main Content */}
       <main className="flex-1 p-6 md:p-12 overflow-y-auto">
         <div className="max-w-4xl mx-auto">
           {loading ? (
             <ContentLoading />
           ) : (
             <>
-              {/* Snippets View */}
               {activeTab === "snippets" && snippetsData && (
-                <SnippetsView data={snippetsData} activeCategory={activeCategory} />
+                <SnippetsView
+                  data={snippetsData}
+                  activeCategory={activeCategory}
+                  activeFramework={activeFramework}
+                />
               )}
 
-              {/* Templates View */}
               {activeTab === "templates" && templatesData && (
-                <TemplatesView data={templatesData} activeCategory={activeCategory} />
+                <TemplatesView
+                  data={templatesData}
+                  activeCategory={activeCategory}
+                />
               )}
 
-              {/* Modules View */}
               {activeTab === "modules" && modulesData && (
                 <ModulesView data={modulesData} />
               )}

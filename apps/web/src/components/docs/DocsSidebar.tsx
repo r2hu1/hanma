@@ -49,13 +49,32 @@ const DocsSidebarComponent = ({
     );
   }, [snippetsData?.categories, searchQuery]);
 
+  // Handle clicking on a framework header
   const handleFrameworkClick = (fw: FrameworkType) => {
+    // Switch to snippets tab when clicking a framework
+    onTabChange("snippets");
     if (expandedFramework === fw) {
+      // Already expanded, just ensure framework is active
       onFrameworkChange(fw);
     } else {
+      // Expand and activate this framework
       setExpandedFramework(fw);
       onFrameworkChange(fw);
     }
+  };
+
+  // Handle clicking on a framework category
+  const handleCategoryClick = (categoryId: string) => {
+    // Ensure we're on snippets tab when clicking a framework category
+    onTabChange("snippets");
+    onCategoryChange(categoryId);
+  };
+
+  // Handle clicking on Resources tabs (Templates/Modules)
+  const handleResourceTabChange = (tab: TabType) => {
+    // Clear expanded framework when switching to resources
+    setExpandedFramework(null);
+    onTabChange(tab);
   };
 
   return (
@@ -87,8 +106,9 @@ const DocsSidebarComponent = ({
 
           {frameworks.map((fw) => {
             const Icon = fw.icon;
-            const isExpanded = expandedFramework === fw.id;
-            const isActive = activeFramework === fw.id;
+            // Only show as expanded if activeTab is snippets AND this framework is expanded
+            const isExpanded = activeTab === "snippets" && expandedFramework === fw.id;
+            const isActive = activeTab === "snippets" && activeFramework === fw.id;
 
             return (
               <div key={fw.id} className="mb-1">
@@ -109,13 +129,13 @@ const DocsSidebarComponent = ({
                   )}
                 </button>
 
-                {/* Expanded Categories */}
+                {/* Expanded Categories - only show when snippets tab is active */}
                 {isExpanded && isActive && snippetsData && (
                   <div className="ml-4 mt-1 space-y-0.5 border-l border-border pl-2">
                     {filteredCategories.map((cat) => (
                       <button
                         key={cat.id}
-                        onClick={() => onCategoryChange(cat.id)}
+                        onClick={() => handleCategoryClick(cat.id)}
                         className={`w-full text-left px-2 py-1.5 rounded text-xs transition-colors ${
                           activeCategory === cat.id
                             ? "bg-secondary text-black font-medium"
@@ -132,23 +152,43 @@ const DocsSidebarComponent = ({
           })}
         </div>
 
-        {/* Templates Section */}
+        {/* Resources Section */}
         <div className="mb-2 mt-4">
           <div className="text-xs font-semibold text-muted uppercase tracking-wider mb-2 px-2">
             Resources
           </div>
+          <div className="mb-1">
+            <button
+              onClick={() => handleResourceTabChange("templates")}
+              className={`w-full text-left px-3 py-2 rounded-lg text-sm flex items-center gap-2 transition-colors ${
+                activeTab === "templates"
+                  ? "bg-primary/10 text-primary font-medium"
+                  : "text-muted hover:text-foreground hover:bg-surface-hover"
+              }`}
+            >
+              Templates
+            </button>
+            {/* Templates Categories */}
+            {activeTab === "templates" && templatesData && (
+              <div className="ml-4 mt-1 space-y-0.5 border-l border-border pl-2">
+                {templatesData.categories.map((cat) => (
+                  <button
+                    key={cat.id}
+                    onClick={() => onCategoryChange(cat.id)}
+                    className={`w-full text-left px-2 py-1.5 rounded text-xs transition-colors ${
+                      activeCategory === cat.id
+                        ? "bg-secondary text-black font-medium"
+                        : "text-muted hover:text-foreground hover:bg-surface-hover"
+                    }`}
+                  >
+                    {cat.title}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
           <button
-            onClick={() => onTabChange("templates")}
-            className={`w-full text-left px-3 py-2 rounded-lg text-sm flex items-center gap-2 transition-colors ${
-              activeTab === "templates"
-                ? "bg-primary/10 text-primary font-medium"
-                : "text-muted hover:text-foreground hover:bg-surface-hover"
-            }`}
-          >
-            Templates
-          </button>
-          <button
-            onClick={() => onTabChange("modules")}
+            onClick={() => handleResourceTabChange("modules")}
             className={`w-full text-left px-3 py-2 rounded-lg text-sm flex items-center gap-2 transition-colors ${
               activeTab === "modules"
                 ? "bg-primary/10 text-primary font-medium"
@@ -158,25 +198,6 @@ const DocsSidebarComponent = ({
             Modules
           </button>
         </div>
-
-        {/* Templates Categories */}
-        {activeTab === "templates" && templatesData && (
-          <div className="ml-4 mt-1 space-y-0.5 border-l border-border pl-2">
-            {templatesData.categories.map((cat) => (
-              <button
-                key={cat.id}
-                onClick={() => onCategoryChange(cat.id)}
-                className={`w-full text-left px-2 py-1.5 rounded text-xs transition-colors ${
-                  activeCategory === cat.id
-                    ? "bg-secondary text-black font-medium"
-                    : "text-muted hover:text-foreground hover:bg-surface-hover"
-                }`}
-              >
-                {cat.title}
-              </button>
-            ))}
-          </div>
-        )}
       </div>
 
       {/* Sidebar Footer */}
