@@ -1,15 +1,18 @@
 import fs from "fs-extra";
 import path from "path";
-import { fileURLToPath } from "url";
 import yaml from "js-yaml";
+import {
+  TEMPLATES_DIR,
+  SNIPPETS_DIR,
+  MODULES_DIR,
+  DOCS_REGISTRY_DIR,
+  parseSnippetFile,
+} from "./utils";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-const TEMPLATES_DIR = path.resolve(__dirname, "../apps/cli/content/templates");
-const SNIPPETS_DIR = path.resolve(__dirname, "../apps/cli/content/snippets");
-const MODULES_DIR = path.resolve(__dirname, "../apps/cli/content/modules");
-const PUBLIC_DIR = path.resolve(__dirname, "../apps/web/public");
+const TEMPLATES_OUTPUT_DIR = path.join(
+  path.dirname(DOCS_REGISTRY_DIR),
+  "templates",
+);
 
 interface TemplateBlock {
   name: string;
@@ -25,64 +28,12 @@ interface TemplateBlock {
   featureType?: string;
 }
 
-interface SnippetMeta {
-  name: string;
-  description?: string;
-  dependencies?: string[];
-  devDependencies?: string[];
-  files?: Array<{ name: string; source?: string }>;
-}
-
-/**
- * Parse a snippet .hbs file and extract frontmatter + body
- */
-async function parseSnippetFile(snippetPath: string): Promise<{
-  meta: SnippetMeta;
-  body: string;
-} | null> {
-  const fullPath = path.join(SNIPPETS_DIR, snippetPath);
-
-  if (!(await fs.pathExists(fullPath))) {
-    console.warn(`  ⚠ Snippet not found: ${snippetPath}`);
-    return null;
-  }
-
-  const content = await fs.readFile(fullPath, "utf-8");
-  const frontmatterMatch = content.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
-
-  if (!frontmatterMatch) {
-    return {
-      meta: { name: path.basename(snippetPath, ".hbs") },
-      body: content,
-    };
-  }
-
-  const metadataRaw = frontmatterMatch[1];
-  const bodyContent = frontmatterMatch[2];
-
-  try {
-    const meta = yaml.load(metadataRaw) as SnippetMeta;
-    return { meta, body: bodyContent };
-  } catch (e) {
-    console.error(`  ⚠ Error parsing snippet ${snippetPath}:`, e);
-    return null;
-  }
-}
-
 async function main() {
   console.log("Building template registry...");
 
-  const REGISTRY_DIR = path.join(PUBLIC_DIR, "templates");
-  await fs.ensureDir(REGISTRY_DIR);
+  await fs.ensureDir(TEMPLATES_OUTPUT_DIR);
 
-  const registry: {
-    base: TemplateBlock[];
-    database: TemplateBlock[];
-    auth: TemplateBlock[];
-    features: TemplateBlock[];
-    presets: TemplateBlock[];
-    extra: TemplateBlock[];
-  } = {
+  const registry: Record<string, TemplateBlock[]> = {
     base: [],
     database: [],
     auth: [],
@@ -91,21 +42,13 @@ async function main() {
     extra: [],
   };
 
-  // Process each category
-  const categories = [
-    "base",
-    "database",
-    "auth",
-    "features",
-    "presets",
-    "extra",
-  ] as const;
+  const categories = Object.keys(registry) as (keyof typeof registry)[];
 
   for (const category of categories) {
     const categoryPath = path.join(TEMPLATES_DIR, category);
     if (!(await fs.pathExists(categoryPath))) continue;
 
-    // Recursively find all _meta.yaml files in this category
+    // Recursive function to find directories containing _meta.yaml
     async function findMetaFiles(dir: string): Promise<string[]> {
       const results: string[] = [];
       const entries = await fs.readdir(dir);
@@ -115,12 +58,10 @@ async function main() {
         const stat = await fs.stat(fullPath);
 
         if (stat.isDirectory()) {
-          // Check if this directory has _meta.yaml
           const metaPath = path.join(fullPath, "_meta.yaml");
           if (await fs.pathExists(metaPath)) {
             results.push(fullPath);
           } else {
-            // Recursively search subdirectories
             results.push(...(await findMetaFiles(fullPath)));
           }
         }
@@ -136,7 +77,6 @@ async function main() {
         .replace(/\//g, "-");
       const metaPath = path.join(blockPath, "_meta.yaml");
 
-      // Parse metadata
       const metaContent = await fs.readFile(metaPath, "utf-8");
       const meta = yaml.load(metaContent) as any;
 
@@ -161,25 +101,25 @@ async function main() {
             typeof include === "string"
               ? { snippet: include, path: null }
               : include;
-
-          const snippetPath = snippetRef.snippet;
+          const snippetPath = path.join(SNIPPETS_DIR, snippetRef.snippet);
           const parsed = await parseSnippetFile(snippetPath);
 
-          if (!parsed) continue;
+          if (!parsed) {
+            console.warn(`⚠ Snippet not found: ${snippetRef.snippet}`);
+            continue;
+          }
 
           // Merge snippet dependencies
           if (parsed.meta.dependencies) {
             for (const dep of parsed.meta.dependencies) {
-              if (!block.dependencies!.includes(dep)) {
+              if (!block.dependencies!.includes(dep))
                 block.dependencies!.push(dep);
-              }
             }
           }
           if (parsed.meta.devDependencies) {
             for (const dep of parsed.meta.devDependencies) {
-              if (!block.devDependencies!.includes(dep)) {
+              if (!block.devDependencies!.includes(dep))
                 block.devDependencies!.push(dep);
-              }
             }
           }
 
@@ -190,161 +130,129 @@ async function main() {
           } else if (parsed.meta.files && parsed.meta.files[0]) {
             outputPath = parsed.meta.files[0].name;
           } else {
-            outputPath = path.basename(snippetPath, ".hbs") + ".ts";
+            outputPath = path.basename(snippetRef.snippet, ".hbs") + ".ts";
           }
 
-          block.files.push({
-            path: outputPath,
-            content: parsed.body,
-          });
-
-          console.log(`    ↳ Included snippet: ${snippetPath} → ${outputPath}`);
+          block.files.push({ path: outputPath, content: parsed.body });
+          console.log(
+            `↳ Included snippet: ${snippetRef.snippet} → ${outputPath}`,
+          );
         }
       }
 
-      // Process modules (bundles of files that reference snippets)
+      // Process modules
       if (meta.modules && Array.isArray(meta.modules)) {
         for (const moduleRef of meta.modules) {
-          const modulePath =
+          const moduleName =
             typeof moduleRef === "string" ? moduleRef : moduleRef.module;
-          const moduleFullPath = path.join(MODULES_DIR, modulePath);
-          const moduleMetaPath = path.join(moduleFullPath, "_meta.yaml");
+          const modulePath = path.join(MODULES_DIR, moduleName);
+          const moduleMetaPath = path.join(modulePath, "_meta.yaml");
 
           if (!(await fs.pathExists(moduleMetaPath))) {
-            console.warn(`  ⚠ Module not found: ${modulePath}`);
+            console.warn(`⚠ Module not found: ${moduleName}`);
             continue;
           }
 
           const moduleMetaContent = await fs.readFile(moduleMetaPath, "utf-8");
           const moduleMeta = yaml.load(moduleMetaContent) as any;
 
-          console.log(`    ↳ Including module: ${modulePath}`);
+          console.log(`↳ Including module: ${moduleName}`);
 
-          // Process snippets referenced by the module
           if (moduleMeta.snippets && Array.isArray(moduleMeta.snippets)) {
-            for (const snippetPath of moduleMeta.snippets) {
-              const parsed = await parseSnippetFile(snippetPath);
+            for (const snippetRef of moduleMeta.snippets) {
+              const snippetSubPath =
+                typeof snippetRef === "string"
+                  ? snippetRef
+                  : snippetRef.snippet;
+              const snippetFullPath = path.join(SNIPPETS_DIR, snippetSubPath);
+              const parsed = await parseSnippetFile(snippetFullPath);
               if (!parsed) continue;
 
-              // Merge dependencies
               if (parsed.meta.dependencies) {
                 for (const dep of parsed.meta.dependencies) {
-                  if (!block.dependencies!.includes(dep)) {
+                  if (!block.dependencies!.includes(dep))
                     block.dependencies!.push(dep);
-                  }
                 }
               }
               if (parsed.meta.devDependencies) {
                 for (const dep of parsed.meta.devDependencies) {
-                  if (!block.devDependencies!.includes(dep)) {
+                  if (!block.devDependencies!.includes(dep))
                     block.devDependencies!.push(dep);
-                  }
                 }
               }
 
               let outputPath: string;
-              if (parsed.meta.files && parsed.meta.files[0]) {
+              if (typeof snippetRef !== "string" && snippetRef.path) {
+                outputPath = snippetRef.path;
+              } else if (parsed.meta.files && parsed.meta.files[0]) {
                 outputPath = parsed.meta.files[0].name;
               } else {
-                outputPath = path.basename(snippetPath, ".hbs") + ".ts";
+                outputPath = path.basename(snippetSubPath, ".hbs") + ".ts";
               }
 
-              block.files.push({
-                path: outputPath,
-                content: parsed.body,
-              });
-
-              console.log(
-                `      ↳ Module snippet: ${snippetPath} → ${outputPath}`,
-              );
+              block.files.push({ path: outputPath, content: parsed.body });
             }
           }
 
           // Merge module's own dependencies
           if (moduleMeta.dependencies) {
             for (const dep of moduleMeta.dependencies) {
-              if (!block.dependencies!.includes(dep)) {
+              if (!block.dependencies!.includes(dep))
                 block.dependencies!.push(dep);
-              }
-            }
-          }
-          if (moduleMeta.devDependencies) {
-            for (const dep of moduleMeta.devDependencies) {
-              if (!block.devDependencies!.includes(dep)) {
-                block.devDependencies!.push(dep);
-              }
             }
           }
 
-          // Collect module's own files
-          async function collectModuleFiles(
-            dir: string,
-            basePath: string = "",
-          ) {
+          // Collect module files
+          const collectFiles = async (dir: string, base: string = "") => {
             const entries = await fs.readdir(dir);
             for (const entry of entries) {
               if (entry === "_meta.yaml") continue;
-
-              const fullPath = path.join(dir, entry);
-              const relativePath = path.join(basePath, entry);
-              const stat = await fs.stat(fullPath);
-
+              const full = path.join(dir, entry);
+              const rel = path.join(base, entry);
+              const stat = await fs.stat(full);
               if (stat.isDirectory()) {
-                await collectModuleFiles(fullPath, relativePath);
+                await collectFiles(full, rel);
               } else {
-                const content = await fs.readFile(fullPath, "utf-8");
                 block.files.push({
-                  path: relativePath,
-                  content,
+                  path: rel,
+                  content: await fs.readFile(full, "utf-8"),
                 });
               }
             }
-          }
-
-          await collectModuleFiles(moduleFullPath);
+          };
+          await collectFiles(modulePath);
         }
       }
 
-      // Collect all files (excluding _meta.yaml)
-      async function collectFiles(dir: string, basePath: string = "") {
+      // Collect block files
+      const collectBlockFiles = async (dir: string, base: string = "") => {
         const entries = await fs.readdir(dir);
         for (const entry of entries) {
           if (entry === "_meta.yaml") continue;
-
-          const fullPath = path.join(dir, entry);
-          const relativePath = path.join(basePath, entry);
-          const stat = await fs.stat(fullPath);
-
+          const full = path.join(dir, entry);
+          const rel = path.join(base, entry);
+          const stat = await fs.stat(full);
           if (stat.isDirectory()) {
-            await collectFiles(fullPath, relativePath);
+            await collectBlockFiles(full, rel);
           } else {
-            const content = await fs.readFile(fullPath, "utf-8");
             block.files.push({
-              path: relativePath,
-              content,
+              path: rel,
+              content: await fs.readFile(full, "utf-8"),
             });
           }
         }
-      }
-
-      await collectFiles(blockPath);
+      };
+      await collectBlockFiles(blockPath);
 
       registry[category].push(block);
-      console.log(`  ✓ ${category}/${blockName} (${block.files.length} files)`);
+      console.log(`✓ ${category}/${blockName} (${block.files.length} files)`);
     }
   }
 
-  // Write registry
-  await fs.writeJSON(path.join(REGISTRY_DIR, "index.json"), registry, {
+  await fs.writeJSON(path.join(TEMPLATES_OUTPUT_DIR, "index.json"), registry, {
     spaces: 2,
   });
-
   console.log(`\nTemplate registry built successfully!`);
-  console.log(`  Base: ${registry.base.length} blocks`);
-  console.log(`  Database: ${registry.database.length} blocks`);
-  console.log(`  Auth: ${registry.auth.length} blocks`);
-  console.log(`  Features: ${registry.features.length} blocks`);
-  console.log(`  Presets: ${registry.presets.length} blocks`);
 }
 
 main().catch(console.error);
