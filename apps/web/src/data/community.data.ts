@@ -1,4 +1,5 @@
 import { BiHeart, BiUser } from "react-icons/bi";
+import { FiMessageCircle } from "react-icons/fi";
 // import { FiMessageCircle } from "react-icons/fi";
 
 export const communityMeta = {
@@ -13,13 +14,13 @@ export const communityMeta = {
 };
 
 export const communityActions = [
-  // {
-  //   id: "discord",
-  //   label: "Join Discord",
-  //   icon: FiMessageCircle,
-  //   className:
-  //     "bg-[#5865F2] hover:bg-[#4752C4] text-white shadow-lg shadow-indigo-500/20",
-  // },
+  {
+    id: "discord",
+    label: "Discord (soon)",
+    icon: FiMessageCircle,
+    className:
+      "bg-[#5865F2] hover:bg-[#4752C4] text-white shadow-lg shadow-indigo-500/20",
+  },
   {
     id: "contributors",
     label: "View Contributors",

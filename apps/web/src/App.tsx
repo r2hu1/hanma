@@ -13,12 +13,12 @@ function App() {
   return (
     <ThemeProvider>
       <div className="min-h-screen bg-background text-foreground selection:bg-secondary selection:text-black relative transition-colors duration-300 flex flex-col">
-        {!isDocs && (
+        {/* {!isDocs && (
           <>
             <div className="fixed inset-0 bg-grid pointer-events-none opacity-[0.3]" />
             <div className="fixed inset-0 bg-gradient-to-b from-background via-transparent to-background pointer-events-none" />
           </>
-        )}
+        )} */}
 
         {!isDocs && <Navbar />}
 

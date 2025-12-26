@@ -8,6 +8,13 @@ import type {
   TabType,
   FrameworkType,
 } from "../types/docs";
+import {
+  snippetIndexes,
+  loadSnippetCategory,
+  templatesIndex,
+  loadTemplateCategory,
+  modulesData as modulesDataImport,
+} from "@/utils/docsLoader";
 
 interface DocsState {
   // Active selections
@@ -79,25 +86,23 @@ export const useDocsStore = create<DocsState & DocsActions>((set, get) => ({
     set({ loading: true });
 
     try {
-      const indexRes = await fetch(`/docs/snippets/${framework}/index.json`);
-      const indexData = await indexRes.json();
+      // Use static imports instead of fetch
+      const indexData = snippetIndexes[framework];
+      if (!indexData) {
+        throw new Error(`No index found for framework: ${framework}`);
+      }
 
-      const categoryPromises = indexData.categoryFiles.map(
-        async (catFile: { id: string; file: string }) => {
-          const res = await fetch(
-            `/docs/snippets/${framework}/${catFile.file}`,
-          );
-          return res.json();
-        },
-      );
-
-      const categories: SnippetCategory[] = await Promise.all(categoryPromises);
+      const categories: SnippetCategory[] = indexData.categoryFiles
+        .map((catFile: { id: string; file: string }) =>
+          loadSnippetCategory(framework, catFile.file),
+        )
+        .filter((cat: unknown): cat is SnippetCategory => cat !== null);
 
       const mergedData: SnippetFramework = {
-        framework: indexData.framework,
-        version: indexData.version,
-        title: indexData.title,
-        description: indexData.description,
+        framework: indexData.framework || framework,
+        version: indexData.version || "",
+        title: indexData.title || "",
+        description: indexData.description || "",
         installNote: indexData.installNote,
         concept: indexData.concept,
         examples: indexData.examples,
@@ -115,7 +120,7 @@ export const useDocsStore = create<DocsState & DocsActions>((set, get) => ({
         activeCategory: categories?.[0]?.id || "",
       });
     } catch (err) {
-      console.error("Failed to fetch snippets:", err);
+      console.error("Failed to load snippets:", err);
       set({ loading: false });
     }
   },
@@ -127,22 +132,22 @@ export const useDocsStore = create<DocsState & DocsActions>((set, get) => ({
     set({ loading: true });
 
     try {
-      const indexRes = await fetch("/docs/templates/express/index.json");
-      const indexData = await indexRes.json();
+      // Use static imports instead of fetch
+      const indexData = templatesIndex;
+      if (!indexData) {
+        throw new Error("No templates index found");
+      }
 
-      const categoryPromises = indexData.categoryFiles.map(
-        async (catFile: { id: string; file: string }) => {
-          const res = await fetch(`/docs/templates/express/${catFile.file}`);
-          return res.json();
-        },
-      );
-
-      const categories: TemplateCategory[] =
-        await Promise.all(categoryPromises);
+      const categories: TemplateCategory[] = indexData.categoryFiles
+        .map(
+          (catFile: { id: string; file: string }) =>
+            loadTemplateCategory(catFile.file) as TemplateCategory,
+        )
+        .filter((cat: unknown): cat is TemplateCategory => cat !== null);
 
       const mergedData: TemplatesData = {
-        title: indexData.title,
-        description: indexData.description,
+        title: indexData.title || "",
+        description: indexData.description || "",
         categories,
         examples: indexData.examples,
       };
@@ -153,7 +158,7 @@ export const useDocsStore = create<DocsState & DocsActions>((set, get) => ({
         activeCategory: categories?.[0]?.id || "",
       });
     } catch (err) {
-      console.error("Failed to fetch templates:", err);
+      console.error("Failed to load templates:", err);
       set({ loading: false });
     }
   },
@@ -165,11 +170,11 @@ export const useDocsStore = create<DocsState & DocsActions>((set, get) => ({
     set({ loading: true });
 
     try {
-      const res = await fetch("/docs/modules/index.json");
-      const data = await res.json();
+      // Use static import instead of fetch
+      const data = modulesDataImport as ModulesData;
       set({ modulesData: data, loading: false });
     } catch (err) {
-      console.error("Failed to fetch modules:", err);
+      console.error("Failed to load modules:", err);
       set({ loading: false });
     }
   },
