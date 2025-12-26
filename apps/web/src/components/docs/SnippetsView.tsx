@@ -11,7 +11,8 @@ interface SnippetsViewProps {
 }
 
 export const SnippetsView = ({ data, activeCategory, activeFramework }: SnippetsViewProps) => {
-  const showIntro = activeCategory === "libs"; 
+  // Show intro when no category is selected (default/overview state)
+  const showIntro = activeCategory === ""; 
 
   return (
     <div>

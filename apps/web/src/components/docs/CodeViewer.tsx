@@ -4,20 +4,14 @@ import { highlightCode, countLines } from "@/utils/shiki-highlighter";
 import { useUIStore } from "@/stores";
 import clsx from "clsx";
 import type { FrameworkType } from "@/types/docs";
+import { getSnippetSource } from "@/utils/docsLoader";
 
 interface CodeViewerProps {
   snippetId: string;
   framework: FrameworkType;
 }
 
-// Cache for fetched source code
-const sourceCache = new Map<string, Record<string, string>>();
-
 const MAX_COLLAPSED_LINES = 10;
-
-// MUST match the background color of your Shiki theme
-// Example: github-dark, vitesse-dark, etc.
-const CODE_BG = "#0f172a";
 
 const CodeViewerComponent = ({ snippetId, framework }: CodeViewerProps) => {
   const [sourceCode, setSourceCode] = useState<string | null>(null);
@@ -34,28 +28,14 @@ const CodeViewerComponent = ({ snippetId, framework }: CodeViewerProps) => {
 
   // Fetch + highlight source
   useEffect(() => {
-    const fetchSource = async () => {
+    const loadSource = async () => {
       setLoading(true);
       setError(null);
 
       try {
-        const cacheKey = framework;
-        let sources = sourceCache.get(cacheKey);
+        // Use static import from docsLoader
+        const code = getSnippetSource(framework, snippetId);
 
-        if (!sources) {
-          const response = await fetch(
-            `/docs/snippets-source/${framework}/sources.json`
-          );
-
-          if (!response.ok) {
-            throw new Error("Source not available");
-          }
-
-          sources = (await response.json()) as Record<string, string>;
-          sourceCache.set(cacheKey, sources);
-        }
-
-        const code = sources[snippetId];
         if (!code) {
           throw new Error("Snippet source not found");
         }
@@ -72,7 +52,7 @@ const CodeViewerComponent = ({ snippetId, framework }: CodeViewerProps) => {
       }
     };
 
-    fetchSource();
+    loadSource();
   }, [snippetId, framework]);
 
   const handleCopy = useCallback(async () => {
@@ -145,12 +125,7 @@ const CodeViewerComponent = ({ snippetId, framework }: CodeViewerProps) => {
 
         {/* Gradient fade — MUST match Shiki background */}
         {!isExpanded && needsExpansion && (
-          <div
-            className="absolute bottom-0 left-0 right-0 h-20 pointer-events-none"
-            style={{
-              background: `linear-gradient(to top, ${CODE_BG}, transparent)`,
-            }}
-          />
+          <div className="absolute bottom-0 left-0 right-0 h-20 pointer-events-none" />
         )}
       </div>
 

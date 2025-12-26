@@ -2,6 +2,7 @@ import { Routes, Route, useLocation } from "react-router-dom";
 import Navbar from "./components/Navbar";
 import LandingPage from "./components/LandingPage";
 import Docs from "./pages/Docs";
+import Contributors from "./pages/Contributors";
 import Footer from "./components/Footer";
 import { ThemeProvider } from "./components/theme/ThemeContext";
 
@@ -12,12 +13,12 @@ function App() {
   return (
     <ThemeProvider>
       <div className="min-h-screen bg-background text-foreground selection:bg-secondary selection:text-black relative transition-colors duration-300 flex flex-col">
-        {!isDocs && (
+        {/* {!isDocs && (
           <>
             <div className="fixed inset-0 bg-grid pointer-events-none opacity-[0.3]" />
             <div className="fixed inset-0 bg-gradient-to-b from-background via-transparent to-background pointer-events-none" />
           </>
-        )}
+        )} */}
 
         {!isDocs && <Navbar />}
 
@@ -27,6 +28,7 @@ function App() {
           <Routes>
             <Route path="/" element={<LandingPage />} />
             <Route path="/docs/*" element={<Docs />} />
+            <Route path="/contributors" element={<Contributors />} />
           </Routes>
         </main>
 
