@@ -63,18 +63,9 @@ const Docs = () => {
     }
   }, [urlState.tab, urlState.framework, fetchSnippetsData, fetchTemplatesData, fetchAddonsData, fetchModulesData]);
 
-  // Set first category as default when data loads and no category in URL
-  useEffect(() => {
-    if (!urlState.category) {
-      if (urlState.tab === "snippets" && snippetsData?.categories?.[0]) {
-        const firstCategory = snippetsData.categories[0].id;
-        navigate(buildDocsPath(urlState.tab, urlState.framework, firstCategory), { replace: true });
-      } else if (urlState.tab === "templates" && templatesData?.categories?.[0]) {
-        const firstCategory = templatesData.categories[0].id;
-        navigate(buildDocsPath(urlState.tab, urlState.framework, firstCategory), { replace: true });
-      }
-    }
-  }, [urlState, snippetsData, templatesData, navigate]);
+  // Note: Removed auto-navigation to first category
+  // Users can now stay on framework overview pages (e.g., /docs/snippets/express)
+  // without being redirected to /docs/snippets/express/libs
 
   const handleTabChange = useCallback(
     (tab: TabType) => {
@@ -90,18 +81,13 @@ const Docs = () => {
     [navigate, urlState.framework]
   );
 
-  const handleFrameworkChange = useCallback(
-    (framework: FrameworkType) => {
-      navigate(buildDocsPath(urlState.tab, framework, ""));
-    },
-    [navigate, urlState.tab]
-  );
 
-  const handleCategoryChange = useCallback(
-    (category: string) => {
-      navigate(buildDocsPath(urlState.tab, urlState.framework, category));
+
+  const handleNavigate = useCallback(
+    (tab: TabType, framework: FrameworkType, category: string = "") => {
+      navigate(buildDocsPath(tab, framework, category));
     },
-    [navigate, urlState.tab, urlState.framework]
+    [navigate]
   );
 
   return (
@@ -112,8 +98,8 @@ const Docs = () => {
         activeCategory={urlState.category}
         activeFramework={urlState.framework}
         onTabChange={handleTabChange}
-        onCategoryChange={handleCategoryChange}
-        onFrameworkChange={handleFrameworkChange}
+
+        onNavigate={handleNavigate}
         snippetsData={snippetsData}
         templatesData={templatesData}
       />

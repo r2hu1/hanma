@@ -54,10 +54,10 @@ import addonsPresets from "@/docs/templates/shared/presets.json";
 import modulesIndex from "@/docs/modules/index.json";
 
 // Snippets Sources
-import expressSourcesJson from "@/docs/snippets-source/express/sources.json";
-import honoSourcesJson from "@/docs/snippets-source/hono/sources.json";
-import elysiaSourcesJson from "@/docs/snippets-source/elysia/sources.json";
-import sharedSourcesJson from "@/docs/snippets-source/shared/sources.json";
+import expressSourcesJson from "@/docs/sources/express/sources.json";
+import honoSourcesJson from "@/docs/sources/hono/sources.json";
+import elysiaSourcesJson from "@/docs/sources/elysia/sources.json";
+import sharedSourcesJson from "@/docs/sources/shared/sources.json";
 
 import type { FrameworkType } from "@/types/docs";
 

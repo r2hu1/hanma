@@ -24,8 +24,7 @@ interface DocsSidebarProps {
   activeCategory: string;
   activeFramework: FrameworkType;
   onTabChange: (tab: TabType) => void;
-  onCategoryChange: (category: string) => void;
-  onFrameworkChange: (framework: FrameworkType) => void;
+  onNavigate: (tab: TabType, framework: FrameworkType, category?: string) => void;
   snippetsData: SnippetFramework | null;
   templatesData: TemplatesData | null;
 }
@@ -49,8 +48,7 @@ const DocsSidebarComponent = ({
   activeCategory,
   activeFramework,
   onTabChange,
-  onCategoryChange,
-  onFrameworkChange,
+  onNavigate,
   snippetsData,
   templatesData,
 }: DocsSidebarProps) => {
@@ -77,22 +75,24 @@ const DocsSidebarComponent = ({
 
   // Handle clicking on a framework header
   const handleFrameworkClick = (fw: FrameworkType) => {
-    // Switch to snippets tab when clicking a framework
-    onTabChange("snippets");
     // Always expand and activate this framework
     setExpandedFramework(fw);
-    onFrameworkChange(fw);
+    onNavigate("snippets", fw);
   };
 
   // Handle clicking on a framework category
   const handleCategoryClick = (categoryId: string) => {
-    onCategoryChange(categoryId);
+    onNavigate("snippets", activeFramework, categoryId);
   };
 
   // Handle clicking on a template framework
   const handleTemplateFrameworkClick = (fw: FrameworkType) => {
-    onTabChange("templates");
-    onFrameworkChange(fw);
+    onNavigate("templates", fw);
+  };
+
+  // Handle clicking on a template category
+  const handleTemplateCategoryClick = (categoryId: string) => {
+    onNavigate("templates", activeFramework, categoryId);
   };
 
   return (
@@ -213,7 +213,7 @@ const DocsSidebarComponent = ({
                     {templatesData.categories.map((cat) => (
                       <button
                         key={cat.id}
-                        onClick={() => handleCategoryClick(cat.id)}
+                        onClick={() => handleTemplateCategoryClick(cat.id)}
                         className={`w-full text-left px-2 py-1.5 rounded text-xs transition-colors ${
                           activeCategory === cat.id
                             ? "bg-secondary text-black font-medium"
