@@ -1,5 +1,455 @@
 {
-  "base": [],
+  "base": [
+    {
+      "name": "express",
+      "category": "base",
+      "description": "Express.js v5 API starter with TypeScript",
+      "framework": "express",
+      "version": "5",
+      "dependencies": [
+        "zod",
+        "express",
+        "cors",
+        "helmet"
+      ],
+      "devDependencies": [
+        "typescript",
+        "@types/node",
+        "tsx",
+        "@types/express",
+        "@types/cors"
+      ],
+      "scripts": {
+        "dev": "tsx watch src/index.ts",
+        "build": "tsc",
+        "start": "node dist/index.js"
+      },
+      "envVars": [
+        "PORT=3000",
+        "NODE_ENV=development"
+      ],
+      "files": [
+        {
+          "path": "src/libs/server.ts",
+          "content": "import http from \"http\";\nimport express from \"express\";\nimport cors from \"cors\";\nimport helmet from \"helmet\";\n\nconst app = express();\nconst server = http.createServer(app);\n\n// Track active connections for graceful shutdown\nconst sockets = new Set<import(\"net\").Socket>();\n\nserver.on(\"connection\", (socket) => {\n  sockets.add(socket);\n  socket.on(\"close\", () => sockets.delete(socket));\n});\n\n// Middleware\napp.use(express.json());\napp.use(express.urlencoded({ extended: true }));\napp.use(cors());\napp.use(helmet());\n\n// Health check endpoint\napp.get(\"/health\", (_req, res) => {\n  res.status(200).json({ status: \"ok\", timestamp: new Date().toISOString() });\n});\n\n// TODO: Add your routes here\n// app.use(\"/api\", yourRouter);\n\n// 404 handler\napp.use((_req, res) => {\n  res.status(404).json({ success: false, message: \"Resource not found\" });\n});\n\n// Error handler\napp.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {\n  console.error(\"[ERROR]\", err.stack || err.message);\n  res.status(500).json({\n    success: false,\n    message: process.env.NODE_ENV === \"development\" ? err.message : \"Internal Server Error\",\n  });\n});\n\nconst PORT = process.env.PORT || 3000;\n\nexport const startServer = async () => {\n  if (server.listening) {\n    console.log(\"Server already running\");\n    return;\n  }\n\n  try {\n    server.listen(PORT, () => {\n      console.log(`Server running on http://localhost:${PORT}`);\n      console.log(`Health check: http://localhost:${PORT}/health`);\n    });\n  } catch (err) {\n    console.error(\"Failed to start server:\", err);\n    process.exit(1);\n  }\n};\n\nexport const shutdown = async (signal: string) => {\n  console.log(`\\n${signal} received. Shutting down gracefully...`);\n\n  server.close(() => {\n    console.log(\"HTTP server closed\");\n    process.exit(0);\n  });\n\n  // Force shutdown after 10s\n  setTimeout(() => {\n    console.warn(\n      `Grace period expired. Forcing close of ${sockets.size} remaining connection(s).`\n    );\n    sockets.forEach((socket) => socket.destroy());\n    process.exit(1);\n  }, 10000).unref();\n};\n\n// Start the server\nstartServer();\n\n// Graceful shutdown handlers\nprocess.on(\"SIGTERM\", () => shutdown(\"SIGTERM\"));\nprocess.on(\"SIGINT\", () => shutdown(\"SIGINT\"));\n\nprocess.on(\"unhandledRejection\", (reason, p) => {\n  console.error(\"Unhandled Rejection at:\", p, \"reason:\", reason);\n});\n\nprocess.on(\"uncaughtException\", (err) => {\n  console.error(\"Uncaught Exception:\", err);\n  process.exit(1);\n});"
+        },
+        {
+          "path": "src/libs/cors.ts",
+          "content": "import cors, { CorsOptions } from \"cors\";\n\n/**\n * Parses environment variables to get allowed origins, methods, and headers.\n */\nconst getEnvConfig = () => {\n  const allowedOrigins: string[] = (process.env.CORS_ORIGINS ?? \"\")\n    .split(\",\")\n    .map((o: string) => o.trim())\n    .filter((o: string) => o.length > 0);\n\n  const allowedMethods: string[] = (process.env.CORS_METHODS ?? \"\")\n    .split(\",\")\n    .map((m: string) => m.trim())\n    .filter((m: string) => m.length > 0);\n\n  const allowedHeaders: string[] = (process.env.CORS_HEADERS ?? \"\")\n    .split(\",\")\n    .map((h: string) => h.trim())\n    .filter((h: string) => h.length > 0);\n\n  return { allowedOrigins, allowedMethods, allowedHeaders };\n};\n\nexport const { allowedOrigins, allowedMethods, allowedHeaders } =\n  getEnvConfig();\n\n/**\n * Creates valid CorsOptions based on provided or environment configuration.\n */\nexport const createCorsOptions = (\n  overrides?: Partial<CorsOptions> & {\n    origins?: string[];\n    methods?: string[];\n    headers?: string[];\n  }\n): CorsOptions => {\n  const origins = overrides?.origins ?? allowedOrigins;\n  const methods = overrides?.methods ?? allowedMethods;\n  const headers = overrides?.headers ?? allowedHeaders;\n\n  return {\n    origin: (\n      origin: string | undefined,\n      callback: (error: Error | null, allow?: boolean) => void\n    ) => {\n      // Allow requests with no origin (mobile apps, curl, same-origin)\n      if (!origin) return callback(null, true);\n\n      if (origins.length === 0 || origins.includes(origin)) {\n        callback(null, true);\n      } else {\n        callback(new Error(\"Not allowed by CORS\"));\n      }\n    },\n    methods,\n    allowedHeaders: headers,\n    credentials: true,\n    ...overrides,\n  };\n};\n\n/**\n * Check if critical CORS configuration is missing.\n * Useful for validating environment setup on startup.\n */\nexport const validateCorsConfig = () => {\n  if (\n    !allowedOrigins.length ||\n    !allowedMethods.length ||\n    !allowedHeaders.length\n  ) {\n    console.warn(\n      \" CORS configuration might be incomplete. Check CORS_ORIGINS, CORS_METHODS, and CORS_HEADERS .env variables.\"\n    );\n    return false;\n  }\n  return true;\n};\n\n// Default export uses strict environment variables but doesn't hard exit only warns if missing,\n// unless strict validation is called.\nconst defaultOptions = createCorsOptions();\nexport const corsMiddleware = cors(defaultOptions);\n"
+        },
+        {
+          "path": "tsconfig.json",
+          "content": "{\n  \"compilerOptions\": {\n    \"target\": \"ES2022\",\n    \"module\": \"CommonJS\",\n    \"rootDir\": \"./src\",\n    \"outDir\": \"./dist\",\n    \"strict\": true,\n    \"esModuleInterop\": true,\n    \"skipLibCheck\": true,\n    \"forceConsistentCasingInFileNames\": true,\n    \"baseUrl\": \".\",\n    \"paths\": {\n      \"@/*\": [\"src/*\"]\n    },\n    \"resolveJsonModule\": true,\n    \"allowSyntheticDefaultImports\": true,\n    \"types\": [\"node\"]\n  },\n  \"include\": [\"src/**/*\"],\n  \"exclude\": [\"node_modules\", \"dist\"]\n}"
+        },
+        {
+          "path": ".env.example",
+          "content": "# Environment\nNODE_ENV=development\nPORT=3000\n\n# Add your environment variables below\n"
+        },
+        {
+          "path": "package.json.hbs",
+          "content": "{\n  \"name\": \"{{projectName}}\",\n  \"version\": \"1.0.0\",\n  \"type\": \"module\",\n  \"scripts\": {\n    \"dev\": \"tsx watch src/index.ts\",\n    \"build\": \"tsc\",\n    \"start\": \"node dist/index.js\"\n  },\n  \"dependencies\": {\n    \"express\": \"^5.0.0\",\n    \"dotenv\": \"^16.3.1\",\n    \"zod\": \"^3.22.4\"\n  },\n  \"devDependencies\": {\n    \"typescript\": \"^5.3.3\",\n    \"@types/express\": \"^5.0.0\",\n    \"@types/node\": \"^20.10.0\",\n    \"tsx\": \"^4.7.0\"\n  }\n}\n"
+        },
+        {
+          "path": "src/index.ts.hbs",
+          "content": "import { shutdown, startServer } from \"@/libs/server\";\n\nstartServer();\n\nprocess.on(\"SIGTERM\", () => shutdown(\"SIGTERM\"));\nprocess.on(\"SIGINT\", () => shutdown(\"SIGINT\"));\n\nprocess.on(\"unhandledRejection\", (reason, p) => {\n  console.error(\"Unhandled Rejection at:\", p, \"reason:\", reason);\n});\n\nprocess.on(\"uncaughtException\", (err) => {\n  console.error(\"Uncaught Exception:\", err);\n  process.exit(1);\n});"
+        }
+      ]
+    },
+    {
+      "name": "express-graphql",
+      "category": "base",
+      "description": "Apollo GraphQL server with Express integration",
+      "framework": "express",
+      "version": "5",
+      "dependencies": [
+        "express",
+        "@apollo/server",
+        "graphql",
+        "cors",
+        "dotenv"
+      ],
+      "devDependencies": [
+        "typescript",
+        "@types/node",
+        "@types/express",
+        "@types/cors",
+        "tsx"
+      ],
+      "scripts": {
+        "dev": "tsx watch src/index.ts",
+        "build": "tsc",
+        "start": "node dist/index.js"
+      },
+      "envVars": [
+        "PORT=4000",
+        "NODE_ENV=development"
+      ],
+      "files": [
+        {
+          "path": "src/libs/graphql-server.ts",
+          "content": "import { ApolloServer } from '@apollo/server';\nimport { expressMiddleware } from '@apollo/server/express4';\nimport { ApolloServerPluginDrainHttpServer } from '@apollo/server/plugin/drainHttpServer';\nimport express from 'express';\nimport http from 'http';\nimport cors from 'cors';\n\n/**\n * GraphQL type definitions\n * Replace with your actual schema\n */\nconst typeDefs = `#graphql\n  type Query {\n    hello: String\n    health: HealthStatus\n  }\n\n  type HealthStatus {\n    status: String!\n    timestamp: String!\n  }\n`;\n\n/**\n * GraphQL resolvers\n * Replace with your actual resolvers\n */\nconst resolvers = {\n  Query: {\n    hello: () => 'Hello from GraphQL!',\n    health: () => ({\n      status: 'ok',\n      timestamp: new Date().toISOString(),\n    }),\n  },\n};\n\n/**\n * Context interface for type-safe resolvers\n */\nexport interface GraphQLContext {\n  // Add your context properties here\n  // user?: { id: string; email: string };\n}\n\n/**\n * Create and configure Apollo Server with Express\n */\nexport const createGraphQLServer = async (port = 4000) => {\n  const app = express();\n  const httpServer = http.createServer(app);\n\n  const server = new ApolloServer<GraphQLContext>({\n    typeDefs,\n    resolvers,\n    plugins: [\n      // Graceful shutdown plugin\n      ApolloServerPluginDrainHttpServer({ httpServer }),\n    ],\n    // Disable introspection in production\n    introspection: process.env.NODE_ENV !== 'production',\n  });\n\n  await server.start();\n\n  app.use(\n    '/graphql',\n    cors<cors.CorsRequest>(),\n    express.json(),\n    expressMiddleware(server, {\n      context: async ({ req }) => {\n        // Build your context here\n        // const token = req.headers.authorization || '';\n        // const user = await getUser(token);\n        return {\n          // user,\n        };\n      },\n    })\n  );\n\n  // Health check endpoint\n  app.get('/health', (_req, res) => {\n    res.json({ status: 'ok', timestamp: new Date().toISOString() });\n  });\n\n  await new Promise<void>((resolve) =>\n    httpServer.listen({ port }, resolve)\n  );\n\n  console.log(`GraphQL server running at http://localhost:${port}/graphql`);\n\n  return { app, httpServer, server };\n};\n\n/**\n * Start the server\n */\nif (require.main === module) {\n  createGraphQLServer().catch(console.error);\n}\n"
+        },
+        {
+          "path": "tsconfig.json",
+          "content": "{\n  \"compilerOptions\": {\n    \"target\": \"ES2022\",\n    \"module\": \"CommonJS\",\n    \"rootDir\": \"./src\",\n    \"outDir\": \"./dist\",\n    \"strict\": true,\n    \"esModuleInterop\": true,\n    \"skipLibCheck\": true,\n    \"forceConsistentCasingInFileNames\": true,\n    \"baseUrl\": \".\",\n    \"paths\": {\n      \"@/*\": [\"src/*\"]\n    },\n    \"resolveJsonModule\": true,\n    \"allowSyntheticDefaultImports\": true,\n    \"types\": [\"node\"]\n  },\n  \"include\": [\"src/**/*\"],\n  \"exclude\": [\"node_modules\", \"dist\"]\n}"
+        },
+        {
+          "path": "src/index.ts.hbs",
+          "content": "import { startGraphQLServer, shutdownGraphQLServer } from \"@/libs/graphql-server\";\n\nstartGraphQLServer();\n\nprocess.on(\"SIGTERM\", () => shutdownGraphQLServer(\"SIGTERM\"));\nprocess.on(\"SIGINT\", () => shutdownGraphQLServer(\"SIGINT\"));\n\nprocess.on(\"unhandledRejection\", (reason, p) => {\n  console.error(\"Unhandled Rejection at:\", p, \"reason:\", reason);\n});\n\nprocess.on(\"uncaughtException\", (err) => {\n  console.error(\"Uncaught Exception:\", err);\n  process.exit(1);\n});\n"
+        }
+      ]
+    },
+    {
+      "name": "express-socket",
+      "category": "base",
+      "description": "Real-time server with Socket.io integration",
+      "framework": "express",
+      "version": "5",
+      "dependencies": [
+        "express",
+        "socket.io",
+        "cors",
+        "dotenv",
+        "jsonwebtoken"
+      ],
+      "devDependencies": [
+        "typescript",
+        "@types/node",
+        "@types/express",
+        "@types/cors",
+        "tsx",
+        "@types/jsonwebtoken"
+      ],
+      "scripts": {
+        "dev": "tsx watch src/index.ts",
+        "build": "tsc",
+        "start": "node dist/index.js"
+      },
+      "envVars": [
+        "PORT=3000",
+        "NODE_ENV=development",
+        "CORS_ORIGIN=http://localhost:3000"
+      ],
+      "files": [
+        {
+          "path": "src/libs/socket-server.ts",
+          "content": "import { Server, Socket } from \"socket.io\";\nimport jwt from \"jsonwebtoken\";\nimport type { Server as HTTPServer } from \"http\";\n\ninterface JwtPayloadOptions {\n  id: string;\n  email: string;\n  name: string;\n}\n\nexport interface AuthenticatedSocket extends Socket {\n  user?: JwtPayloadOptions;\n}\n\ninterface InitSocketOptions {\n  /** The HTTP server instance to attach socket.io to */\n  server: HTTPServer;\n  /**\n   * Allowed CORS origins\n   * @default \"*\"\n   */\n  allowedOrigins?: string | string[];\n  /**\n   * Allowed HTTP methods for CORS\n   * @default [\"GET\", \"POST\"]\n   */\n  allowedMethods?: string[];\n  /** Allowed headers for CORS */\n  allowedHeaders?: string[];\n  /**\n   * Whether to validate JWT token on connection handshake\n   * @default true\n   */\n  validateToken?: boolean;\n}\n\nexport function initializeSocket({\n  server,\n  allowedOrigins = \"*\",\n  allowedMethods = [\"GET\", \"POST\"],\n  allowedHeaders,\n  validateToken = true,\n}: InitSocketOptions): Server {\n  const io = new Server(server, {\n    cors: {\n      origin: allowedOrigins,\n      methods: allowedMethods,\n      allowedHeaders,\n      credentials: true,\n    },\n  });\n\n  io.use((socket: AuthenticatedSocket, next) => {\n    console.log(\n      `[${new Date().toISOString()}] Socket connected: ${socket.id}, ` +\n        `IP: ${socket.handshake.address}, ` +\n        `Transport: ${socket.conn.transport}`\n    );\n\n    // If validation is disabled, skip auth check\n    if (!validateToken) return next();\n\n    const token = socket.handshake.query.token as string;\n    if (!token) return next(new Error(\"Authentication error\"));\n\n    try {\n      const secret: jwt.Secret = process.env.JWT_ACCESS_SECRET!;\n      const decoded = jwt.verify(token, secret) as JwtPayloadOptions;\n      socket.user = decoded;\n      next();\n    } catch (err) {\n      console.error(\"JWT verification failed:\", err);\n      next(new Error(\"Authentication error\"));\n    }\n  });\n\n  return io;\n}\n"
+        },
+        {
+          "path": "tsconfig.json",
+          "content": "{\n  \"compilerOptions\": {\n    \"target\": \"ES2022\",\n    \"module\": \"CommonJS\",\n    \"rootDir\": \"./src\",\n    \"outDir\": \"./dist\",\n    \"strict\": true,\n    \"esModuleInterop\": true,\n    \"skipLibCheck\": true,\n    \"forceConsistentCasingInFileNames\": true,\n    \"baseUrl\": \".\",\n    \"paths\": {\n      \"@/*\": [\"src/*\"]\n    },\n    \"resolveJsonModule\": true,\n    \"allowSyntheticDefaultImports\": true,\n    \"types\": [\"node\"]\n  },\n  \"include\": [\"src/**/*\"],\n  \"exclude\": [\"node_modules\", \"dist\"]\n}"
+        },
+        {
+          "path": "src/index.ts.hbs",
+          "content": "import { startSocketServer, shutdownSocketServer } from \"@/libs/socket-server\";\n\nstartSocketServer();\n\nprocess.on(\"SIGTERM\", () => shutdownSocketServer(\"SIGTERM\"));\nprocess.on(\"SIGINT\", () => shutdownSocketServer(\"SIGINT\"));\n\nprocess.on(\"unhandledRejection\", (reason, p) => {\n  console.error(\"Unhandled Rejection at:\", p, \"reason:\", reason);\n});\n\nprocess.on(\"uncaughtException\", (err) => {\n  console.error(\"Uncaught Exception:\", err);\n  process.exit(1);\n});\n"
+        }
+      ]
+    },
+    {
+      "name": "express-trpc",
+      "category": "base",
+      "description": "tRPC server with Express adapter for end-to-end type safety",
+      "framework": "express",
+      "version": "5",
+      "dependencies": [
+        "express",
+        "@trpc/server",
+        "zod",
+        "cors",
+        "dotenv"
+      ],
+      "devDependencies": [
+        "typescript",
+        "@types/node",
+        "@types/express",
+        "@types/cors",
+        "tsx"
+      ],
+      "scripts": {
+        "dev": "tsx watch src/index.ts",
+        "build": "tsc",
+        "start": "node dist/index.js"
+      },
+      "envVars": [
+        "PORT=3000",
+        "NODE_ENV=development"
+      ],
+      "files": [
+        {
+          "path": "src/libs/trpc-server.ts",
+          "content": "import { initTRPC, TRPCError } from '@trpc/server';\nimport { createExpressMiddleware } from '@trpc/server/adapters/express';\nimport express from 'express';\nimport { z } from 'zod';\n\n/**\n * Context creation function\n * Called for each request, provides context to all procedures\n */\nconst createContext = ({ req, res }: { req: express.Request; res: express.Response }) => {\n  // Extract user from auth header if present\n  // const token = req.headers.authorization?.split(' ')[1];\n  // const user = token ? verifyToken(token) : null;\n  \n  return {\n    req,\n    res,\n    // user,\n  };\n};\n\ntype Context = Awaited<ReturnType<typeof createContext>>;\n\n/**\n * Initialize tRPC with context\n */\nconst t = initTRPC.context<Context>().create({\n  errorFormatter({ shape, error }) {\n    return {\n      ...shape,\n      data: {\n        ...shape.data,\n        // Add custom error data here\n      },\n    };\n  },\n});\n\n/**\n * Reusable middleware\n */\nconst isAuthenticated = t.middleware(({ ctx, next }) => {\n  // if (!ctx.user) {\n  //   throw new TRPCError({ code: 'UNAUTHORIZED' });\n  // }\n  return next({\n    ctx: {\n      ...ctx,\n      // user: ctx.user,\n    },\n  });\n});\n\n/**\n * Procedure builders\n */\nexport const router = t.router;\nexport const publicProcedure = t.procedure;\nexport const protectedProcedure = t.procedure.use(isAuthenticated);\n\n/**\n * Example router with procedures\n */\nconst appRouter = router({\n  // Health check\n  health: publicProcedure.query(() => ({\n    status: 'ok',\n    timestamp: new Date().toISOString(),\n  })),\n\n  // Example public procedure\n  hello: publicProcedure\n    .input(z.object({ name: z.string().optional() }))\n    .query(({ input }) => {\n      return { greeting: `Hello ${input.name || 'World'}!` };\n    }),\n\n  // Example mutation\n  createItem: publicProcedure\n    .input(z.object({\n      title: z.string().min(1).max(100),\n      description: z.string().optional(),\n    }))\n    .mutation(async ({ input }) => {\n      // Save to database\n      const item = {\n        id: Math.random().toString(36).slice(2),\n        ...input,\n        createdAt: new Date(),\n      };\n      return item;\n    }),\n\n  // Nested routers\n  user: router({\n    list: publicProcedure.query(() => {\n      return [{ id: '1', name: 'John' }];\n    }),\n    byId: publicProcedure\n      .input(z.object({ id: z.string() }))\n      .query(({ input }) => {\n        return { id: input.id, name: 'John' };\n      }),\n  }),\n});\n\n/**\n * Export type for client usage\n */\nexport type AppRouter = typeof appRouter;\n\n/**\n * Create and start tRPC server with Express\n */\nexport const createTRPCServer = (port = 4000) => {\n  const app = express();\n\n  // Health check endpoint\n  app.get('/health', (_req, res) => {\n    res.json({ status: 'ok', timestamp: new Date().toISOString() });\n  });\n\n  // tRPC middleware\n  app.use(\n    '/trpc',\n    createExpressMiddleware({\n      router: appRouter,\n      createContext,\n      onError({ error, path }) {\n        console.error(`[ERROR] tRPC error on ${path}:`, error.message);\n      },\n    })\n  );\n\n  const server = app.listen(port, () => {\n    console.log(`tRPC server running at http://localhost:${port}/trpc`);\n  });\n\n  return { app, server, router: appRouter };\n};\n\n/**\n * Start the server\n */\nif (require.main === module) {\n  createTRPCServer();\n}\n"
+        },
+        {
+          "path": "tsconfig.json",
+          "content": "{\n  \"compilerOptions\": {\n    \"target\": \"ES2022\",\n    \"module\": \"CommonJS\",\n    \"rootDir\": \"./src\",\n    \"outDir\": \"./dist\",\n    \"strict\": true,\n    \"esModuleInterop\": true,\n    \"skipLibCheck\": true,\n    \"forceConsistentCasingInFileNames\": true,\n    \"baseUrl\": \".\",\n    \"paths\": {\n      \"@/*\": [\"src/*\"]\n    },\n    \"resolveJsonModule\": true,\n    \"allowSyntheticDefaultImports\": true,\n    \"types\": [\"node\"]\n  },\n  \"include\": [\"src/**/*\"],\n  \"exclude\": [\"node_modules\", \"dist\"]\n}"
+        },
+        {
+          "path": "src/index.ts.hbs",
+          "content": "import { startTRPCServer, shutdownTRPCServer } from \"@/libs/trpc-server\";\n\nstartTRPCServer();\n\nprocess.on(\"SIGTERM\", () => shutdownTRPCServer(\"SIGTERM\"));\nprocess.on(\"SIGINT\", () => shutdownTRPCServer(\"SIGINT\"));\n\nprocess.on(\"unhandledRejection\", (reason, p) => {\n  console.error(\"Unhandled Rejection at:\", p, \"reason:\", reason);\n});\n\nprocess.on(\"uncaughtException\", (err) => {\n  console.error(\"Uncaught Exception:\", err);\n  process.exit(1);\n});\n"
+        }
+      ]
+    },
+    {
+      "name": "hono",
+      "category": "base",
+      "description": "Production-ready Hono server for Node.js with TypeScript",
+      "framework": "hono",
+      "version": "4",
+      "dependencies": [
+        "hono",
+        "@hono/node-server",
+        "zod"
+      ],
+      "devDependencies": [
+        "typescript",
+        "@types/node",
+        "tsx"
+      ],
+      "scripts": {
+        "dev": "tsx watch src/index.ts",
+        "build": "tsc",
+        "start": "node dist/index.js"
+      },
+      "envVars": [
+        "PORT=3000",
+        "NODE_ENV=development",
+        "CORS_ORIGINS=http://localhost:3000"
+      ],
+      "files": [
+        {
+          "path": "src/libs/server.ts",
+          "content": "import { Hono } from \"hono\";\nimport { logger } from \"hono/logger\";\nimport { requestId } from \"hono/request-id\";\nimport { cors } from \"hono/cors\";\nimport { secureHeaders } from \"hono/secure-headers\";\nimport { timing } from \"hono/timing\";\nimport { serve } from \"@hono/node-server\";\nimport type { Context } from \"hono\";\n\n// Environment configuration\nconst config = {\n  port: Number(process.env.PORT) || 3000,\n  env: process.env.NODE_ENV || \"development\",\n  corsOrigins: process.env.CORS_ORIGINS?.split(\",\") || [\"*\"],\n  shutdownTimeout: Number(process.env.SHUTDOWN_TIMEOUT) || 10000,\n};\n\n// Application type with custom variables\ntype AppEnv = {\n  Variables: {\n    requestId: string;\n    startTime: number;\n  };\n};\n\nconst app = new Hono<AppEnv>();\n\n// Security and observability middleware\napp.use(\"*\", secureHeaders());\napp.use(\"*\", timing());\napp.use(\"*\", requestId());\napp.use(\"*\", logger());\napp.use(\"*\", cors({\n  origin: config.corsOrigins,\n  allowMethods: [\"GET\", \"POST\", \"PUT\", \"DELETE\", \"PATCH\", \"OPTIONS\"],\n  allowHeaders: [\"Content-Type\", \"Authorization\", \"X-Request-ID\"],\n  exposeHeaders: [\"X-Request-ID\", \"X-Response-Time\"],\n  maxAge: 86400,\n  credentials: true,\n}));\n\n// Request timing middleware\napp.use(\"*\", async (c, next) => {\n  c.set(\"startTime\", Date.now());\n  await next();\n});\n\n// Health check endpoint\napp.get(\"/health\", (c) => {\n  const uptime = process.uptime();\n  const memory = process.memoryUsage();\n  \n  return c.json({\n    status: \"healthy\",\n    timestamp: new Date().toISOString(),\n    runtime: \"node\",\n    version: process.version,\n    uptime: {\n      seconds: Math.floor(uptime),\n      formatted: formatUptime(uptime),\n    },\n    memory: {\n      heapUsed: formatBytes(memory.heapUsed),\n      heapTotal: formatBytes(memory.heapTotal),\n      rss: formatBytes(memory.rss),\n    },\n  });\n});\n\n// Readiness check for k8s/container orchestration\napp.get(\"/ready\", (c) => {\n  // Add your readiness checks here (DB connection, cache, etc.)\n  return c.json({ ready: true });\n});\n\n// Liveness check\napp.get(\"/live\", (c) => c.text(\"OK\"));\n\n// Example route\napp.get(\"/\", (c) => {\n  return c.json({\n    message: \"Hello from Hono!\",\n    requestId: c.get(\"requestId\"),\n    environment: config.env,\n  });\n});\n\n// 404 handler\napp.notFound((c) => {\n  return c.json(\n    {\n      success: false,\n      error: {\n        code: \"NOT_FOUND\",\n        message: `Path ${c.req.method} ${c.req.path} not found`,\n      },\n      requestId: c.get(\"requestId\"),\n    },\n    404\n  );\n});\n\n// Global error handler\napp.onError((err, c) => {\n  const requestId = c.get(\"requestId\") || \"unknown\";\n  const status = \"status\" in err ? (err.status as number) : 500;\n  \n  // Structured error logging\n  console.error(JSON.stringify({\n    level: \"error\",\n    message: err.message,\n    stack: err.stack,\n    requestId,\n    path: c.req.path,\n    method: c.req.method,\n    timestamp: new Date().toISOString(),\n  }));\n  \n  return c.json(\n    {\n      success: false,\n      error: {\n        code: status === 500 ? \"INTERNAL_ERROR\" : \"REQUEST_ERROR\",\n        message: config.env === \"production\" \n          ? \"An unexpected error occurred\" \n          : err.message,\n      },\n      requestId,\n    },\n    status\n  );\n});\n\n// Utility functions\nfunction formatUptime(seconds: number): string {\n  const days = Math.floor(seconds / 86400);\n  const hours = Math.floor((seconds % 86400) / 3600);\n  const mins = Math.floor((seconds % 3600) / 60);\n  return `${days}d ${hours}h ${mins}m`;\n}\n\nfunction formatBytes(bytes: number): string {\n  const units = [\"B\", \"KB\", \"MB\", \"GB\"];\n  let i = 0;\n  while (bytes >= 1024 && i < units.length - 1) {\n    bytes /= 1024;\n    i++;\n  }\n  return `${bytes.toFixed(2)} ${units[i]}`;\n}\n\n// Start server\nconst server = serve({\n  fetch: app.fetch,\n  port: config.port,\n}, (info) => {\n  console.log(JSON.stringify({\n    level: \"info\",\n    message: \"Server started\",\n    port: info.port,\n    environment: config.env,\n    timestamp: new Date().toISOString(),\n  }));\n});\n\n// Graceful shutdown\nlet isShuttingDown = false;\n\nconst shutdown = (signal: string) => {\n  if (isShuttingDown) return;\n  isShuttingDown = true;\n  \n  console.log(JSON.stringify({\n    level: \"info\",\n    message: `${signal} received, shutting down gracefully`,\n    timestamp: new Date().toISOString(),\n  }));\n  \n  server.close(() => {\n    console.log(JSON.stringify({\n      level: \"info\",\n      message: \"Server stopped\",\n      timestamp: new Date().toISOString(),\n    }));\n    process.exit(0);\n  });\n  \n  // Force shutdown after timeout\n  setTimeout(() => {\n    console.error(JSON.stringify({\n      level: \"error\",\n      message: \"Forced shutdown due to timeout\",\n      timestamp: new Date().toISOString(),\n    }));\n    process.exit(1);\n  }, config.shutdownTimeout).unref();\n};\n\nprocess.on(\"SIGTERM\", () => shutdown(\"SIGTERM\"));\nprocess.on(\"SIGINT\", () => shutdown(\"SIGINT\"));"
+        },
+        {
+          "path": "tsconfig.json",
+          "content": "{\n  \"compilerOptions\": {\n    \"target\": \"ES2022\",\n    \"module\": \"CommonJS\",\n    \"rootDir\": \"./src\",\n    \"outDir\": \"./dist\",\n    \"strict\": true,\n    \"esModuleInterop\": true,\n    \"skipLibCheck\": true,\n    \"forceConsistentCasingInFileNames\": true,\n    \"baseUrl\": \".\",\n    \"paths\": {\n      \"@/*\": [\"src/*\"]\n    },\n    \"resolveJsonModule\": true,\n    \"allowSyntheticDefaultImports\": true,\n    \"types\": [\"node\"]\n  },\n  \"include\": [\"src/**/*\"],\n  \"exclude\": [\"node_modules\", \"dist\"]\n}"
+        },
+        {
+          "path": "package.json.hbs",
+          "content": "{ \"name\": \"{{projectName}}\", \"version\": \"1.0.0\", \"type\": \"module\", \"scripts\": {\n\"dev\": \"tsx watch src/index.ts\", \"build\": \"tsc\", \"start\": \"node dist/index.js\"\n}, \"dependencies\": { \"hono\": \"^4.6.0\", \"@hono/node-server\": \"^1.13.0\", \"dotenv\":\n\"^16.3.1\", \"zod\": \"^3.22.4\" }, \"devDependencies\": { \"typescript\": \"^5.3.3\",\n\"@types/node\": \"^20.10.0\", \"tsx\": \"^4.7.0\" } }"
+        },
+        {
+          "path": "src/index.ts.hbs",
+          "content": "import { shutdown, startServer } from \"@/libs/server\";\n\nstartServer();\n\nprocess.on(\"SIGTERM\", () => shutdown(\"SIGTERM\"));\nprocess.on(\"SIGINT\", () => shutdown(\"SIGINT\"));\n\nprocess.on(\"unhandledRejection\", (reason, p) => {\n  console.error(\"Unhandled Rejection at:\", p, \"reason:\", reason);\n});\n\nprocess.on(\"uncaughtException\", (err) => {\n  console.error(\"Uncaught Exception:\", err);\n  process.exit(1);\n});\n"
+        }
+      ]
+    },
+    {
+      "name": "hono-bun",
+      "category": "base",
+      "description": "Production-ready Hono server optimized for Bun runtime",
+      "framework": "hono",
+      "version": "4",
+      "dependencies": [
+        "hono",
+        "zod"
+      ],
+      "devDependencies": [
+        "bun-types"
+      ],
+      "scripts": {
+        "dev": "bun run --watch src/index.ts",
+        "build": "bun build src/index.ts --outdir dist --target bun",
+        "start": "bun run dist/index.js"
+      },
+      "envVars": [
+        "PORT=3000",
+        "NODE_ENV=development",
+        "CORS_ORIGINS=http://localhost:3000"
+      ],
+      "files": [
+        {
+          "path": "src/libs/server.ts",
+          "content": "import { Hono } from \"hono\";\nimport { logger } from \"hono/logger\";\nimport { requestId } from \"hono/request-id\";\nimport { cors } from \"hono/cors\";\nimport { secureHeaders } from \"hono/secure-headers\";\nimport { timing } from \"hono/timing\";\nimport type { Context } from \"hono\";\n\n// Environment configuration\nconst config = {\n  port: Number(Bun.env.PORT) || 3000,\n  env: Bun.env.NODE_ENV || \"development\",\n  corsOrigins: Bun.env.CORS_ORIGINS?.split(\",\") || [\"*\"],\n};\n\n// Application type with custom variables\ntype AppEnv = {\n  Variables: {\n    requestId: string;\n    startTime: number;\n  };\n};\n\nconst app = new Hono<AppEnv>();\n\n// Security and observability middleware\napp.use(\"*\", secureHeaders());\napp.use(\"*\", timing());\napp.use(\"*\", requestId());\napp.use(\"*\", logger());\napp.use(\"*\", cors({\n  origin: config.corsOrigins,\n  allowMethods: [\"GET\", \"POST\", \"PUT\", \"DELETE\", \"PATCH\", \"OPTIONS\"],\n  allowHeaders: [\"Content-Type\", \"Authorization\", \"X-Request-ID\"],\n  exposeHeaders: [\"X-Request-ID\", \"X-Response-Time\"],\n  maxAge: 86400,\n  credentials: true,\n}));\n\n// Request timing middleware\napp.use(\"*\", async (c, next) => {\n  c.set(\"startTime\", Date.now());\n  await next();\n});\n\n// Health check endpoint\napp.get(\"/health\", (c) => {\n  const uptime = process.uptime();\n  const memory = process.memoryUsage();\n  \n  return c.json({\n    status: \"healthy\",\n    timestamp: new Date().toISOString(),\n    runtime: \"bun\",\n    version: Bun.version,\n    uptime: {\n      seconds: Math.floor(uptime),\n      formatted: formatUptime(uptime),\n    },\n    memory: {\n      heapUsed: formatBytes(memory.heapUsed),\n      heapTotal: formatBytes(memory.heapTotal),\n      rss: formatBytes(memory.rss),\n    },\n  });\n});\n\n// Readiness check for k8s/container orchestration\napp.get(\"/ready\", (c) => {\n  // Add your readiness checks here (DB connection, cache, etc.)\n  return c.json({ ready: true });\n});\n\n// Liveness check\napp.get(\"/live\", (c) => c.text(\"OK\"));\n\n// Example route\napp.get(\"/\", (c) => {\n  return c.json({\n    message: \"Hello from Bun!\",\n    requestId: c.get(\"requestId\"),\n    environment: config.env,\n  });\n});\n\n// 404 handler\napp.notFound((c) => {\n  return c.json(\n    {\n      success: false,\n      error: {\n        code: \"NOT_FOUND\",\n        message: `Path ${c.req.method} ${c.req.path} not found`,\n      },\n      requestId: c.get(\"requestId\"),\n    },\n    404\n  );\n});\n\n// Global error handler\napp.onError((err, c) => {\n  const requestId = c.get(\"requestId\") || \"unknown\";\n  const status = \"status\" in err ? (err.status as number) : 500;\n  \n  // Log error with context\n  console.error(JSON.stringify({\n    level: \"error\",\n    message: err.message,\n    stack: err.stack,\n    requestId,\n    path: c.req.path,\n    method: c.req.method,\n    timestamp: new Date().toISOString(),\n  }));\n  \n  return c.json(\n    {\n      success: false,\n      error: {\n        code: status === 500 ? \"INTERNAL_ERROR\" : \"REQUEST_ERROR\",\n        message: config.env === \"production\" \n          ? \"An unexpected error occurred\" \n          : err.message,\n      },\n      requestId,\n    },\n    status\n  );\n});\n\n// Utility functions\nfunction formatUptime(seconds: number): string {\n  const days = Math.floor(seconds / 86400);\n  const hours = Math.floor((seconds % 86400) / 3600);\n  const mins = Math.floor((seconds % 3600) / 60);\n  return `${days}d ${hours}h ${mins}m`;\n}\n\nfunction formatBytes(bytes: number): string {\n  const units = [\"B\", \"KB\", \"MB\", \"GB\"];\n  let i = 0;\n  while (bytes >= 1024 && i < units.length - 1) {\n    bytes /= 1024;\n    i++;\n  }\n  return `${bytes.toFixed(2)} ${units[i]}`;\n}\n\n// Start server\nconst server = Bun.serve({\n  port: config.port,\n  fetch: app.fetch,\n  error(error) {\n    console.error(\"Unhandled server error:\", error);\n    return new Response(\"Internal Server Error\", { status: 500 });\n  },\n});\n\nconsole.log(JSON.stringify({\n  level: \"info\",\n  message: \"Server started\",\n  port: server.port,\n  environment: config.env,\n  timestamp: new Date().toISOString(),\n}));\n\n// Graceful shutdown\nconst shutdown = (signal: string) => {\n  console.log(JSON.stringify({\n    level: \"info\",\n    message: `${signal} received, shutting down gracefully`,\n    timestamp: new Date().toISOString(),\n  }));\n  \n  server.stop();\n  \n  // Allow pending requests to complete\n  setTimeout(() => {\n    console.log(JSON.stringify({\n      level: \"info\",\n      message: \"Server stopped\",\n      timestamp: new Date().toISOString(),\n    }));\n    process.exit(0);\n  }, 5000);\n};\n\nprocess.on(\"SIGTERM\", () => shutdown(\"SIGTERM\"));\nprocess.on(\"SIGINT\", () => shutdown(\"SIGINT\"));\n"
+        },
+        {
+          "path": "package.json.hbs",
+          "content": "{\n  \"name\": \"{{projectName}}\",\n  \"version\": \"1.0.0\",\n  \"type\": \"module\",\n  \"scripts\": {\n    \"dev\": \"bun run --watch src/index.ts\",\n    \"build\": \"bun build src/index.ts --outdir dist --target bun\",\n    \"start\": \"bun run dist/index.js\"\n  },\n  \"dependencies\": {\n    \"hono\": \"^4.6.0\",\n    \"zod\": \"^3.22.4\"\n  },\n  \"devDependencies\": {\n    \"bun-types\": \"latest\"\n  }\n}\n"
+        },
+        {
+          "path": "src/index.ts.hbs",
+          "content": "import { shutdown, startServer } from \"@/libs/server\";\n\nstartServer();\n\nprocess.on(\"SIGTERM\", () => shutdown(\"SIGTERM\"));\nprocess.on(\"SIGINT\", () => shutdown(\"SIGINT\"));\n\nprocess.on(\"unhandledRejection\", (reason, p) => {\n  console.error(\"Unhandled Rejection at:\", p, \"reason:\", reason);\n});\n\nprocess.on(\"uncaughtException\", (err) => {\n  console.error(\"Uncaught Exception:\", err);\n  process.exit(1);\n});\n"
+        }
+      ]
+    },
+    {
+      "name": "hono-cloudflare",
+      "category": "base",
+      "description": "Production-ready Hono server for Cloudflare Workers with edge capabilities",
+      "framework": "hono",
+      "version": "4",
+      "dependencies": [
+        "hono",
+        "zod"
+      ],
+      "devDependencies": [
+        "wrangler",
+        "@cloudflare/workers-types"
+      ],
+      "scripts": {
+        "dev": "wrangler dev",
+        "deploy": "wrangler deploy"
+      },
+      "envVars": [
+        "NODE_ENV=development"
+      ],
+      "files": [
+        {
+          "path": "src/index.ts",
+          "content": "import { Hono } from \"hono\";\nimport { logger } from \"hono/logger\";\nimport { requestId } from \"hono/request-id\";\nimport { cors } from \"hono/cors\";\nimport { secureHeaders } from \"hono/secure-headers\";\nimport { timing } from \"hono/timing\";\nimport { cache } from \"hono/cache\";\n\n// Type definitions for Cloudflare bindings\ntype Bindings = {\n  ENVIRONMENT: string;\n  CORS_ORIGINS: string;\n  // Add your bindings here:\n  // MY_KV: KVNamespace;\n  // MY_DB: D1Database;\n  // MY_R2: R2Bucket;\n};\n\ntype Variables = {\n  requestId: string;\n};\n\nconst app = new Hono<{ Bindings: Bindings; Variables: Variables }>();\n\n// Security middleware\napp.use(\"*\", secureHeaders());\napp.use(\"*\", timing());\napp.use(\"*\", requestId());\napp.use(\"*\", logger());\n\n// Dynamic CORS based on environment binding\napp.use(\"*\", async (c, next) => {\n  const origins = c.env.CORS_ORIGINS?.split(\",\") || [\"*\"];\n  return cors({\n    origin: origins,\n    allowMethods: [\"GET\", \"POST\", \"PUT\", \"DELETE\", \"PATCH\", \"OPTIONS\"],\n    allowHeaders: [\"Content-Type\", \"Authorization\", \"X-Request-ID\"],\n    exposeHeaders: [\"X-Request-ID\", \"X-Response-Time\"],\n    maxAge: 86400,\n    credentials: true,\n  })(c, next);\n});\n\n// Cache static responses at edge\napp.get(\n  \"/health\",\n  cache({\n    cacheName: \"health-check\",\n    cacheControl: \"public, max-age=60\",\n  }),\n  (c) => {\n    const cf = c.req.raw.cf;\n    \n    return c.json({\n      status: \"healthy\",\n      timestamp: new Date().toISOString(),\n      runtime: \"cloudflare-workers\",\n      edge: {\n        colo: cf?.colo || \"unknown\",\n        country: cf?.country || \"unknown\",\n        city: cf?.city || \"unknown\",\n        region: cf?.region || \"unknown\",\n      },\n      environment: c.env.ENVIRONMENT || \"development\",\n    });\n  }\n);\n\n// Example route with request context\napp.get(\"/\", (c) => {\n  const cf = c.req.raw.cf;\n  \n  return c.json({\n    message: \"Hello from Cloudflare Workers!\",\n    requestId: c.get(\"requestId\"),\n    edge: {\n      colo: cf?.colo,\n      country: cf?.country,\n    },\n  });\n});\n\n// Example: KV operations (uncomment when binding is configured)\n// app.get(\"/kv/:key\", async (c) => {\n//   const key = c.req.param(\"key\");\n//   const value = await c.env.MY_KV.get(key);\n//   \n//   if (!value) {\n//     return c.json({ \n//       success: false, \n//       error: { code: \"NOT_FOUND\", message: \"Key not found\" } \n//     }, 404);\n//   }\n//   \n//   return c.json({ key, value });\n// });\n\n// app.put(\"/kv/:key\", async (c) => {\n//   const key = c.req.param(\"key\");\n//   const body = await c.req.json<{ value: string; ttl?: number }>();\n//   \n//   await c.env.MY_KV.put(key, body.value, {\n//     expirationTtl: body.ttl || 3600,\n//   });\n//   \n//   return c.json({ success: true, key });\n// });\n\n// 404 handler\napp.notFound((c) => {\n  return c.json(\n    {\n      success: false,\n      error: {\n        code: \"NOT_FOUND\",\n        message: `Path ${c.req.method} ${c.req.path} not found`,\n      },\n      requestId: c.get(\"requestId\"),\n    },\n    404\n  );\n});\n\n// Global error handler\napp.onError((err, c) => {\n  const requestId = c.get(\"requestId\") || \"unknown\";\n  const status = \"status\" in err ? (err.status as number) : 500;\n  const isProduction = c.env.ENVIRONMENT === \"production\";\n  \n  // Log to console (visible in Workers logs)\n  console.error(JSON.stringify({\n    level: \"error\",\n    message: err.message,\n    requestId,\n    path: c.req.path,\n    method: c.req.method,\n    colo: c.req.raw.cf?.colo,\n    timestamp: new Date().toISOString(),\n  }));\n  \n  return c.json(\n    {\n      success: false,\n      error: {\n        code: status === 500 ? \"INTERNAL_ERROR\" : \"REQUEST_ERROR\",\n        message: isProduction ? \"An unexpected error occurred\" : err.message,\n      },\n      requestId,\n    },\n    status\n  );\n});\n\nexport default app;\n"
+        },
+        {
+          "path": "package.json.hbs",
+          "content": "{\n  \"name\": \"{{projectName}}\",\n  \"version\": \"1.0.0\",\n  \"type\": \"module\",\n  \"scripts\": {\n    \"dev\": \"wrangler dev\",\n    \"deploy\": \"wrangler deploy\"\n  },\n  \"dependencies\": {\n    \"hono\": \"^4.6.0\",\n    \"zod\": \"^3.22.4\"\n  },\n  \"devDependencies\": {\n    \"wrangler\": \"^3.0.0\",\n    \"@cloudflare/workers-types\": \"^4.0.0\"\n  }\n}\n"
+        },
+        {
+          "path": "wrangler.toml.hbs",
+          "content": "name = \"{{projectName}}\"\nmain = \"src/index.ts\"\ncompatibility_date = \"2024-01-01\"\n\n[vars]\nNODE_ENV = \"development\"\n\n# Uncomment to enable Workers KV\n# [[kv_namespaces]]\n# binding = \"MY_KV\"\n# id = \"your-kv-namespace-id\"\n\n# Uncomment to enable D1 Database\n# [[d1_databases]]\n# binding = \"DB\"\n# database_name = \"your-database\"\n# database_id = \"your-database-id\"\n"
+        }
+      ]
+    },
+    {
+      "name": "hono-deno",
+      "category": "base",
+      "description": "Production-ready Hono server for Deno runtime",
+      "framework": "hono",
+      "version": "4",
+      "dependencies": [],
+      "devDependencies": [],
+      "scripts": {
+        "dev": "deno run --allow-net --allow-env --watch src/index.ts",
+        "start": "deno run --allow-net --allow-env src/index.ts"
+      },
+      "envVars": [
+        "PORT=3000",
+        "NODE_ENV=development",
+        "CORS_ORIGINS=http://localhost:3000"
+      ],
+      "files": [
+        {
+          "path": "src/index.ts",
+          "content": "import { Hono } from \"https://deno.land/x/hono/mod.ts\";\nimport { logger } from \"https://deno.land/x/hono/middleware.ts\";\nimport { requestId } from \"https://deno.land/x/hono/middleware.ts\";\nimport { cors } from \"https://deno.land/x/hono/middleware.ts\";\nimport { secureHeaders } from \"https://deno.land/x/hono/middleware.ts\";\nimport { timing } from \"https://deno.land/x/hono/middleware.ts\";\n\n// Environment configuration\nconst config = {\n  port: Number(Deno.env.get(\"PORT\")) || 3000,\n  env: Deno.env.get(\"DENO_ENV\") || \"development\",\n  corsOrigins: Deno.env.get(\"CORS_ORIGINS\")?.split(\",\") || [\"*\"],\n};\n\n// Application type\ntype AppEnv = {\n  Variables: {\n    requestId: string;\n    startTime: number;\n  };\n};\n\nconst app = new Hono<AppEnv>();\n\n// Security and observability middleware\napp.use(\"*\", secureHeaders());\napp.use(\"*\", timing());\napp.use(\"*\", requestId());\napp.use(\"*\", logger());\napp.use(\"*\", cors({\n  origin: config.corsOrigins,\n  allowMethods: [\"GET\", \"POST\", \"PUT\", \"DELETE\", \"PATCH\", \"OPTIONS\"],\n  allowHeaders: [\"Content-Type\", \"Authorization\", \"X-Request-ID\"],\n  exposeHeaders: [\"X-Request-ID\", \"X-Response-Time\"],\n  maxAge: 86400,\n  credentials: true,\n}));\n\n// Request timing\napp.use(\"*\", async (c, next) => {\n  c.set(\"startTime\", Date.now());\n  await next();\n});\n\n// Health check endpoint\napp.get(\"/health\", (c) => {\n  const memory = Deno.memoryUsage();\n  \n  return c.json({\n    status: \"healthy\",\n    timestamp: new Date().toISOString(),\n    runtime: \"deno\",\n    version: Deno.version.deno,\n    typescript: Deno.version.typescript,\n    v8: Deno.version.v8,\n    memory: {\n      heapUsed: formatBytes(memory.heapUsed),\n      heapTotal: formatBytes(memory.heapTotal),\n      rss: formatBytes(memory.rss),\n    },\n  });\n});\n\n// Readiness check\napp.get(\"/ready\", (c) => {\n  return c.json({ ready: true });\n});\n\n// Liveness check\napp.get(\"/live\", (c) => c.text(\"OK\"));\n\n// Example route\napp.get(\"/\", (c) => {\n  return c.json({\n    message: \"Hello from Deno!\",\n    requestId: c.get(\"requestId\"),\n    environment: config.env,\n  });\n});\n\n// 404 handler\napp.notFound((c) => {\n  return c.json(\n    {\n      success: false,\n      error: {\n        code: \"NOT_FOUND\",\n        message: `Path ${c.req.method} ${c.req.path} not found`,\n      },\n      requestId: c.get(\"requestId\"),\n    },\n    404\n  );\n});\n\n// Global error handler\napp.onError((err, c) => {\n  const requestId = c.get(\"requestId\") || \"unknown\";\n  const status = \"status\" in err ? (err.status as number) : 500;\n  \n  // Structured logging\n  console.error(JSON.stringify({\n    level: \"error\",\n    message: err.message,\n    stack: err.stack,\n    requestId,\n    path: c.req.path,\n    method: c.req.method,\n    timestamp: new Date().toISOString(),\n  }));\n  \n  return c.json(\n    {\n      success: false,\n      error: {\n        code: status === 500 ? \"INTERNAL_ERROR\" : \"REQUEST_ERROR\",\n        message: config.env === \"production\" \n          ? \"An unexpected error occurred\" \n          : err.message,\n      },\n      requestId,\n    },\n    status\n  );\n});\n\n// Utility function\nfunction formatBytes(bytes: number): string {\n  const units = [\"B\", \"KB\", \"MB\", \"GB\"];\n  let i = 0;\n  while (bytes >= 1024 && i < units.length - 1) {\n    bytes /= 1024;\n    i++;\n  }\n  return `${bytes.toFixed(2)} ${units[i]}`;\n}\n\n// Abort controller for graceful shutdown\nconst abortController = new AbortController();\n\n// Start server\nDeno.serve(\n  {\n    port: config.port,\n    signal: abortController.signal,\n    onListen: ({ port, hostname }) => {\n      console.log(JSON.stringify({\n        level: \"info\",\n        message: \"Server started\",\n        hostname,\n        port,\n        environment: config.env,\n        timestamp: new Date().toISOString(),\n      }));\n    },\n  },\n  app.fetch\n);\n\n// Graceful shutdown\nconst shutdown = (signal: string) => {\n  console.log(JSON.stringify({\n    level: \"info\",\n    message: `${signal} received, shutting down gracefully`,\n    timestamp: new Date().toISOString(),\n  }));\n  \n  abortController.abort();\n  \n  setTimeout(() => {\n    console.log(JSON.stringify({\n      level: \"info\",\n      message: \"Server stopped\",\n      timestamp: new Date().toISOString(),\n    }));\n    Deno.exit(0);\n  }, 5000);\n};\n\nDeno.addSignalListener(\"SIGTERM\", () => shutdown(\"SIGTERM\"));\nDeno.addSignalListener(\"SIGINT\", () => shutdown(\"SIGINT\"));\n"
+        },
+        {
+          "path": "deno.json.hbs",
+          "content": "{\n  \"name\": \"{{projectName}}\",\n  \"version\": \"1.0.0\",\n  \"tasks\": {\n    \"dev\": \"deno run --allow-net --allow-env --watch src/index.ts\",\n    \"start\": \"deno run --allow-net --allow-env src/index.ts\"\n  },\n  \"imports\": {\n    \"hono\": \"npm:hono@^4.6.0\",\n    \"zod\": \"npm:zod@^3.22.4\"\n  },\n  \"compilerOptions\": {\n    \"lib\": [\"deno.ns\", \"deno.unstable\"]\n  }\n}\n"
+        }
+      ]
+    },
+    {
+      "name": "hono-lambda",
+      "category": "base",
+      "description": "Production-ready Hono server for AWS Lambda with API Gateway support",
+      "framework": "hono",
+      "version": "4",
+      "dependencies": [
+        "hono",
+        "@hono/aws-lambda",
+        "zod"
+      ],
+      "devDependencies": [
+        "typescript",
+        "@types/node",
+        "@types/aws-lambda",
+        "esbuild"
+      ],
+      "scripts": {
+        "build": "esbuild src/index.ts --bundle --platform=node --outfile=dist/index.js --format=esm --minify",
+        "dev": "tsx watch src/index.ts"
+      },
+      "envVars": [
+        "NODE_ENV=development"
+      ],
+      "files": [
+        {
+          "path": "src/index.ts",
+          "content": "import { Hono } from \"hono\";\nimport { handle, type LambdaEvent, type LambdaContext } from \"@hono/aws-lambda\";\nimport { logger } from \"hono/logger\";\nimport { requestId } from \"hono/request-id\";\nimport { cors } from \"hono/cors\";\nimport { secureHeaders } from \"hono/secure-headers\";\nimport { timing } from \"hono/timing\";\n\n// Environment configuration\nconst config = {\n  env: process.env.NODE_ENV || \"development\",\n  corsOrigins: process.env.CORS_ORIGINS?.split(\",\") || [\"*\"],\n  region: process.env.AWS_REGION || \"unknown\",\n  functionName: process.env.AWS_LAMBDA_FUNCTION_NAME || \"unknown\",\n};\n\n// Cold start tracking\nlet coldStart = true;\n\n// Application type\ntype AppEnv = {\n  Variables: {\n    requestId: string;\n    lambdaContext: LambdaContext;\n  };\n};\n\nconst app = new Hono<AppEnv>();\n\n// Security and observability middleware\napp.use(\"*\", secureHeaders());\napp.use(\"*\", timing());\napp.use(\"*\", requestId());\napp.use(\"*\", logger());\napp.use(\"*\", cors({\n  origin: config.corsOrigins,\n  allowMethods: [\"GET\", \"POST\", \"PUT\", \"DELETE\", \"PATCH\", \"OPTIONS\"],\n  allowHeaders: [\"Content-Type\", \"Authorization\", \"X-Request-ID\"],\n  exposeHeaders: [\"X-Request-ID\", \"X-Response-Time\"],\n  maxAge: 86400,\n  credentials: true,\n}));\n\n// Health check endpoint\napp.get(\"/health\", (c) => {\n  const isColdStart = coldStart;\n  coldStart = false;\n  \n  return c.json({\n    status: \"healthy\",\n    timestamp: new Date().toISOString(),\n    runtime: \"aws-lambda\",\n    region: config.region,\n    functionName: config.functionName,\n    coldStart: isColdStart,\n    memoryLimit: `${process.env.AWS_LAMBDA_FUNCTION_MEMORY_SIZE}MB`,\n  });\n});\n\n// Example route\napp.get(\"/\", (c) => {\n  return c.json({\n    message: \"Hello from AWS Lambda!\",\n    requestId: c.get(\"requestId\"),\n    environment: config.env,\n  });\n});\n\n// Example with path parameters and validation\napp.get(\"/users/:id\", (c) => {\n  const id = c.req.param(\"id\");\n  \n  // Basic validation\n  if (!/^\\d+$/.test(id)) {\n    return c.json(\n      {\n        success: false,\n        error: {\n          code: \"VALIDATION_ERROR\",\n          message: \"User ID must be a number\",\n        },\n      },\n      400\n    );\n  }\n  \n  return c.json({\n    user: {\n      id: Number(id),\n      name: \"Example User\",\n    },\n    requestId: c.get(\"requestId\"),\n  });\n});\n\n// 404 handler\napp.notFound((c) => {\n  return c.json(\n    {\n      success: false,\n      error: {\n        code: \"NOT_FOUND\",\n        message: `Path ${c.req.method} ${c.req.path} not found`,\n      },\n      requestId: c.get(\"requestId\"),\n    },\n    404\n  );\n});\n\n// Global error handler\napp.onError((err, c) => {\n  const requestId = c.get(\"requestId\") || \"unknown\";\n  const status = \"status\" in err ? (err.status as number) : 500;\n  \n  // Structured logging for CloudWatch\n  console.error(JSON.stringify({\n    level: \"error\",\n    message: err.message,\n    stack: err.stack,\n    requestId,\n    path: c.req.path,\n    method: c.req.method,\n    functionName: config.functionName,\n    region: config.region,\n    timestamp: new Date().toISOString(),\n  }));\n  \n  return c.json(\n    {\n      success: false,\n      error: {\n        code: status === 500 ? \"INTERNAL_ERROR\" : \"REQUEST_ERROR\",\n        message: config.env === \"production\" \n          ? \"An unexpected error occurred\" \n          : err.message,\n      },\n      requestId,\n    },\n    status\n  );\n});\n\n// Lambda handler with cold start reset\nexport const handler = async (event: LambdaEvent, context: LambdaContext) => {\n  // Track cold start per invocation\n  const isCold = coldStart;\n  coldStart = false;\n  \n  // Add cold start header\n  const response = await handle(app)(event, context);\n  \n  // Log invocation metrics\n  console.log(JSON.stringify({\n    level: \"info\",\n    type: \"invocation\",\n    path: event.path || event.rawPath,\n    method: event.httpMethod || event.requestContext?.http?.method,\n    coldStart: isCold,\n    remainingTimeMs: context.getRemainingTimeInMillis(),\n    requestId: context.awsRequestId,\n    timestamp: new Date().toISOString(),\n  }));\n  \n  return response;\n};\n"
+        },
+        {
+          "path": "package.json.hbs",
+          "content": "{\n  \"name\": \"{{projectName}}\",\n  \"version\": \"1.0.0\",\n  \"type\": \"module\",\n  \"scripts\": {\n    \"build\": \"esbuild src/index.ts --bundle --platform=node --outfile=dist/index.js --format=esm --minify\",\n    \"dev\": \"tsx watch src/index.ts\"\n  },\n  \"dependencies\": {\n    \"hono\": \"^4.6.0\",\n    \"@hono/aws-lambda\": \"^1.0.0\",\n    \"zod\": \"^3.22.4\"\n  },\n  \"devDependencies\": {\n    \"typescript\": \"^5.3.3\",\n    \"@types/node\": \"^20.10.0\",\n    \"@types/aws-lambda\": \"^8.10.0\",\n    \"esbuild\": \"^0.20.0\",\n    \"tsx\": \"^4.7.0\"\n  }\n}\n"
+        }
+      ]
+    },
+    {
+      "name": "hono-vercel",
+      "category": "base",
+      "description": "Production-ready Hono server for Vercel Edge Functions",
+      "framework": "hono",
+      "version": "4",
+      "dependencies": [
+        "hono",
+        "@hono/vercel",
+        "zod"
+      ],
+      "devDependencies": [
+        "typescript",
+        "@types/node",
+        "vercel"
+      ],
+      "scripts": {
+        "dev": "vercel dev",
+        "deploy": "vercel"
+      },
+      "envVars": [
+        "NODE_ENV=development"
+      ],
+      "files": [
+        {
+          "path": "api/index.ts",
+          "content": "import { Hono } from \"hono\";\nimport { handle } from \"hono/vercel\";\nimport { logger } from \"hono/logger\";\nimport { requestId } from \"hono/request-id\";\nimport { cors } from \"hono/cors\";\nimport { secureHeaders } from \"hono/secure-headers\";\nimport { timing } from \"hono/timing\";\nimport { cache } from \"hono/cache\";\n\nexport const config = {\n  runtime: \"edge\",\n};\n\n// Environment configuration\nconst envConfig = {\n  env: process.env.NODE_ENV || \"development\",\n  corsOrigins: process.env.CORS_ORIGINS?.split(\",\") || [\"*\"],\n  region: process.env.VERCEL_REGION || \"unknown\",\n  deployment: process.env.VERCEL_URL || \"localhost\",\n};\n\n// Application type\ntype AppEnv = {\n  Variables: {\n    requestId: string;\n  };\n};\n\nconst app = new Hono<AppEnv>().basePath(\"/api\");\n\n// Security and observability middleware\napp.use(\"*\", secureHeaders());\napp.use(\"*\", timing());\napp.use(\"*\", requestId());\napp.use(\"*\", logger());\napp.use(\"*\", cors({\n  origin: envConfig.corsOrigins,\n  allowMethods: [\"GET\", \"POST\", \"PUT\", \"DELETE\", \"PATCH\", \"OPTIONS\"],\n  allowHeaders: [\"Content-Type\", \"Authorization\", \"X-Request-ID\"],\n  exposeHeaders: [\"X-Request-ID\", \"X-Response-Time\"],\n  maxAge: 86400,\n  credentials: true,\n}));\n\n// Cached health check\napp.get(\n  \"/health\",\n  cache({\n    cacheName: \"health-check\",\n    cacheControl: \"public, max-age=60\",\n  }),\n  (c) => {\n    return c.json({\n      status: \"healthy\",\n      timestamp: new Date().toISOString(),\n      runtime: \"vercel-edge\",\n      region: envConfig.region,\n      deployment: envConfig.deployment,\n      environment: envConfig.env,\n    });\n  }\n);\n\n// Example route\napp.get(\"/\", (c) => {\n  return c.json({\n    message: \"Hello from Vercel Edge!\",\n    requestId: c.get(\"requestId\"),\n    region: envConfig.region,\n    environment: envConfig.env,\n  });\n});\n\n// Example with caching\napp.get(\n  \"/cached\",\n  cache({\n    cacheName: \"cached-response\",\n    cacheControl: \"public, max-age=300, s-maxage=600, stale-while-revalidate=86400\",\n  }),\n  (c) => {\n    return c.json({\n      data: \"This response is cached at the edge\",\n      generatedAt: new Date().toISOString(),\n      requestId: c.get(\"requestId\"),\n    });\n  }\n);\n\n// 404 handler\napp.notFound((c) => {\n  return c.json(\n    {\n      success: false,\n      error: {\n        code: \"NOT_FOUND\",\n        message: `Path ${c.req.method} ${c.req.path} not found`,\n      },\n      requestId: c.get(\"requestId\"),\n    },\n    404\n  );\n});\n\n// Global error handler\napp.onError((err, c) => {\n  const requestId = c.get(\"requestId\") || \"unknown\";\n  const status = \"status\" in err ? (err.status as number) : 500;\n  const isProduction = envConfig.env === \"production\";\n  \n  // Log error (visible in Vercel logs)\n  console.error(JSON.stringify({\n    level: \"error\",\n    message: err.message,\n    requestId,\n    path: c.req.path,\n    method: c.req.method,\n    region: envConfig.region,\n    timestamp: new Date().toISOString(),\n  }));\n  \n  return c.json(\n    {\n      success: false,\n      error: {\n        code: status === 500 ? \"INTERNAL_ERROR\" : \"REQUEST_ERROR\",\n        message: isProduction ? \"An unexpected error occurred\" : err.message,\n      },\n      requestId,\n    },\n    status\n  );\n});\n\nexport default handle(app);\n"
+        },
+        {
+          "path": "package.json.hbs",
+          "content": "{\n  \"name\": \"{{projectName}}\",\n  \"version\": \"1.0.0\",\n  \"type\": \"module\",\n  \"scripts\": {\n    \"dev\": \"vercel dev\",\n    \"deploy\": \"vercel\"\n  },\n  \"dependencies\": {\n    \"hono\": \"^4.6.0\",\n    \"@hono/vercel\": \"^1.0.0\",\n    \"zod\": \"^3.22.4\"\n  },\n  \"devDependencies\": {\n    \"typescript\": \"^5.3.3\",\n    \"@types/node\": \"^20.10.0\",\n    \"vercel\": \"^33.0.0\"\n  }\n}\n"
+        },
+        {
+          "path": "vercel.json.hbs",
+          "content": "{\n  \"rewrites\": [\n    {\n      \"source\": \"/(.*)\",\n      \"destination\": \"/api\"\n    }\n  ]\n}\n"
+        }
+      ]
+    },
+    {
+      "name": "elysia",
+      "category": "base",
+      "description": "Production-ready Elysia server for Bun runtime with TypeScript and Swagger",
+      "framework": "elysia",
+      "version": "1",
+      "dependencies": [
+        "elysia",
+        "@elysiajs/swagger",
+        "@elysiajs/cors",
+        "zod"
+      ],
+      "devDependencies": [
+        "bun-types",
+        "@types/node"
+      ],
+      "scripts": {
+        "dev": "bun run --watch src/index.ts",
+        "build": "bun build src/index.ts --outdir dist --target bun",
+        "start": "bun run dist/index.js"
+      },
+      "envVars": [
+        "PORT=3000",
+        "NODE_ENV=development"
+      ],
+      "files": [
+        {
+          "path": "src/libs/server.ts",
+          "content": "import { Elysia, t } from \"elysia\";\nimport { swagger } from \"@elysiajs/swagger\";\n\nconst app = new Elysia()\n  .use(swagger({\n    documentation: {\n      info: {\n        title: \"Elysia Production API\",\n        version: \"1.0.0\",\n      }\n    }\n  }))\n  // Global error handling\n  .error({\n    BAD_REQUEST: 400,\n    UNAUTHORIZED: 401,\n    FORBIDDEN: 403,\n    NOT_FOUND: 404,\n    INTERNAL_SERVER_ERROR: 500\n  })\n  .onError(({ code, error, set }) => {\n    console.error(`[${code}] ${error.message}`);\n    \n    return {\n      success: false,\n      code,\n      message: process.env.NODE_ENV === \"production\" && code === \"INTERNAL_SERVER_ERROR\"\n        ? \"Internal Server Error\"\n        : error.message,\n    };\n  })\n  // Health check\n  .get(\"/health\", () => ({\n    status: \"ok\",\n    uptime: process.uptime(),\n    timestamp: new Date().toISOString(),\n  }))\n  .get(\"/\", () => ({ message: \"Hello Elysia\" }))\n  .listen(process.env.PORT || 3000);\n\nconsole.log(\n  `Elysia is running at ${app.server?.hostname}:${app.server?.port}`\n);\n\n// Graceful shutdown (Bun native)\nprocess.on(\"SIGTERM\", () => {\n  console.log(\"SIGTERM received. Cleaning up...\");\n  app.stop();\n  process.exit(0);\n});\n\nprocess.on(\"SIGINT\", () => {\n  console.log(\"SIGINT received. Cleaning up...\");\n  app.stop();\n  process.exit(0);\n});\n"
+        },
+        {
+          "path": "package.json.hbs",
+          "content": "{\n  \"name\": \"{{projectName}}\",\n  \"version\": \"1.0.0\",\n  \"type\": \"module\",\n  \"scripts\": {\n    \"dev\": \"bun run --watch src/index.ts\",\n    \"build\": \"bun build src/index.ts --outdir dist --target bun\",\n    \"start\": \"bun run dist/index.js\"\n  },\n  \"dependencies\": {\n    \"elysia\": \"^1.0.0\",\n    \"@elysiajs/swagger\": \"^1.0.0\",\n    \"@elysiajs/cors\": \"^1.0.0\",\n    \"zod\": \"^3.22.4\"\n  },\n  \"devDependencies\": {\n    \"bun-types\": \"latest\"\n  }\n}\n"
+        },
+        {
+          "path": "src/index.ts.hbs",
+          "content": "import { startServer, shutdown } from \"@/libs/server\";\n\nstartServer();\n\nprocess.on(\"SIGTERM\", () => shutdown(\"SIGTERM\"));\nprocess.on(\"SIGINT\", () => shutdown(\"SIGINT\"));\n\nprocess.on(\"unhandledRejection\", (reason, p) => {\n  console.error(\"Unhandled Rejection at:\", p, \"reason:\", reason);\n});\n\nprocess.on(\"uncaughtException\", (err) => {\n  console.error(\"Uncaught Exception:\", err);\n  process.exit(1);\n});\n"
+        }
+      ]
+    }
+  ],
   "database": [
     {
       "name": "drizzle-mysql",
