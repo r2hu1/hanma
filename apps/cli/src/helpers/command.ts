@@ -8,7 +8,7 @@ import {
   TemplateFile,
   RegistryItem,
 } from "../types";
-import { batchInstallDependencies } from "./install";
+import { batchInstallDependencies } from "../utils";
 
 /**
  * Parse a dependency string like "express@4.18.0" or "@types/node@20.0.0"

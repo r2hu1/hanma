@@ -3,3 +3,4 @@ export * from "./add";
 export * from "./create";
 export * from "./module";
 export * from "./help";
+export * from "./show";
