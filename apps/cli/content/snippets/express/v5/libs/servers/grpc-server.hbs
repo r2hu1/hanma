@@ -154,8 +154,7 @@ export const shutdownGRPCServer = (server: grpc.Server): Promise<void> => {
 };
 
 /**
- * Start the server
- */
+
 if (require.main === module) {
   createGRPCServer()
     .then((server) => {
@@ -165,7 +164,7 @@ if (require.main === module) {
     .catch(console.error);
 }
 
-/**
+
  * Example .proto file content:
  * 
  * syntax = "proto3";
