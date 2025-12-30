@@ -9,14 +9,10 @@ import {
   promptMultiSelect,
   promptPackageManager,
 } from "../utils/prompts";
-import { collectBlockData, writeProjectFiles } from "../utils/command-helpers";
 import path from "path";
 import { TEMPLATES_URL } from "../constants";
-import { createConfig } from "../utils/config";
+import { collectBlockData, writeProjectFiles } from "../helpers";
 
-// ============================================================================
-// Template Registry
-// ============================================================================
 
 async function fetchTemplateRegistry(): Promise<TemplateRegistry> {
   const res = await fetch(`${TEMPLATES_URL}/index.json`);
@@ -42,9 +38,6 @@ async function validateProjectPath(projectName: string): Promise<string> {
   return projectPath;
 }
 
-// ============================================================================
-// Dependency Parsing & Installation Helpers
-// ============================================================================
 
 /**
  * Build the final package.json object

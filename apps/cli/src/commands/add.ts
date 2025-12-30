@@ -10,11 +10,10 @@ import {
   promptFramework,
   fetchRegistry,
   promptVersion,
-  findItemsByName,
   promptCategory,
-  installRegistryItems,
   createConfig,
 } from "../utils";
+import { findItemsByName, installRegistryItems } from "../helpers";
 
 /**
  * Filter registry items by version (snippets only)

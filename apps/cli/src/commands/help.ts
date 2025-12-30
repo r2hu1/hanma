@@ -16,6 +16,7 @@ export const help = new Command()
     ${chalk.yellow("create")} [name]           Scaffold a new backend project from templates
     ${chalk.yellow("add")} [snippets...]       Add snippet(s) to your project
     ${chalk.yellow("module")} [modules...]     Add multi-file module(s) to your project
+    ${chalk.yellow("show")} <snippets|templates> Show details about snippets or templates
     ${chalk.yellow("help")}                    Display this help message
 
   ${chalk.bold("ALIASES")}
@@ -27,6 +28,10 @@ export const help = new Command()
     ${chalk.dim("-f, --framework <fw>")}  Framework to use
     ${chalk.dim("-v, --version <ver>")}   Version to use
     ${chalk.dim("-p, --path <path>")}     Destination path
+
+  ${chalk.bold("SHOW OPTIONS")}
+    ${chalk.dim("-f, --framework <fw>")}  Framework to use
+    ${chalk.dim("--json")}                Output in JSON format
 
   ${chalk.bold("EXAMPLES")}
     ${chalk.dim("# Initialize Hanma in your project")}
@@ -49,6 +54,15 @@ export const help = new Command()
 
     ${chalk.dim("# Add specific modules")}
     $ hanma mod i18n billing
+
+    ${chalk.dim("# Show available snippets for a framework")}
+    $ hanma show snippets --framework express
+
+    ${chalk.dim("# Show details for a specific snippet")}
+    $ hanma show snippets cors --framework express
+
+    ${chalk.dim("# Show available templates")}
+    $ hanma show templates --framework hono
 
   ${chalk.bold("DOCUMENTATION")}
     ${chalk.underline("https://github.com/itstheanurag/hanma")}

@@ -6,13 +6,12 @@ import { RegistryItem } from "../types";
 import {
   fetchFrameworks,
   fetchRegistry,
-  findItemsByName,
   getConfig,
-  installRegistryItems,
   promptCategory,
   promptFramework,
   promptVersion,
 } from "../utils";
+import { findItemsByName, installRegistryItems } from "../helpers";
 
 /**
  * Filter registry items by version (modules only)
