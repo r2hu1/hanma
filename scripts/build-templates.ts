@@ -237,8 +237,6 @@ async function main() {
 
   const registry: Record<string, TemplateBlock[]> = {
     base: [],
-    database: [],
-    auth: [],
     features: [],
     presets: [],
     extra: [],

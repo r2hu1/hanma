@@ -93,7 +93,7 @@ async function main() {
   // ============================================================================
   // Process Framework Snippets
   // ============================================================================
-  console.log("\n📦 Processing framework snippets...");
+  console.log("\n Processing framework snippets...");
 
   const frameworkDirs = await fs.readdir(SNIPPETS_DIR);
 
@@ -121,13 +121,13 @@ async function main() {
       { spaces: 2 },
     );
 
-    console.log(`    ✓ ${frameworkRegistry.length} snippets`);
+    console.log(` ✓ ${frameworkRegistry.length} snippets`);
   }
 
   // ============================================================================
   // Process Addons (shared cross-framework snippets)
   // ============================================================================
-  console.log("\n🔧 Processing addons (shared)...");
+  console.log("\n Processing addons (shared)...");
 
   if (await fs.pathExists(SHARED_DIR)) {
     const addonsRegistry = await processDirectory(
@@ -148,15 +148,15 @@ async function main() {
       { spaces: 2 },
     );
 
-    console.log(`  ✓ ${addonsRegistry.length} addons`);
+    console.log(`✓ ${addonsRegistry.length} addons`);
   } else {
-    console.log("  - No shared directory found");
+    console.log("- No shared directory found");
   }
 
   // ============================================================================
   // Process Tooling Configs
   // ============================================================================
-  console.log("\n⚙️  Processing tooling...");
+  console.log("\n Processing tooling...");
 
   if (await fs.pathExists(TOOLING_DIR)) {
     const toolingRegistry = await processDirectory(
@@ -176,9 +176,9 @@ async function main() {
       { spaces: 2 },
     );
 
-    console.log(`  ✓ ${toolingRegistry.length} tooling configs`);
+    console.log(`✓ ${toolingRegistry.length} tooling configs`);
   } else {
-    console.log("  - No tooling directory found");
+    console.log("- No tooling directory found");
   }
 
   // ============================================================================
@@ -188,9 +188,9 @@ async function main() {
     spaces: 2,
   });
 
-  console.log(`\n✅ Registry built successfully!`);
-  console.log(`   Frameworks: ${frameworks.join(", ")}`);
-  console.log(`   Additional: shared (addons), tooling`);
+  console.log(`\nRegistry built successfully!`);
+  console.log(`Frameworks: ${frameworks.join(", ")}`);
+  console.log(`Additional: shared (addons), tooling`);
 }
 
 main().catch(console.error);

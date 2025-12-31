@@ -5,6 +5,7 @@ import yaml from "js-yaml";
 import {
   MODULES_DIR,
   SNIPPETS_DIR,
+  SHARED_DIR,
   DOCS_REGISTRY_DIR,
   parseSnippetFile,
 } from "./utils";
@@ -14,153 +15,224 @@ const MODULES_OUTPUT_DIR = path.join(
   "modules",
 );
 
+/**
+ * Resolve a snippet reference path to its actual filesystem path.
+ * Handles shared/... paths to SHARED_DIR and all others to SNIPPETS_DIR
+ */
+function resolveSnippetPath(snippetRef: string): string {
+  if (snippetRef.startsWith("shared/")) {
+    const relativePath = snippetRef.replace("shared/", "");
+    return path.join(SHARED_DIR, relativePath);
+  }
+  return path.join(SNIPPETS_DIR, snippetRef);
+}
+
 interface ModuleBlock {
   name: string;
   description: string;
-  framework: string;
-  version: string;
-  category?: string;
+  category: string;
+  framework?: string;
+  version?: string;
   dependencies: string[];
   devDependencies: string[];
-  snippets: string[];
+  scripts?: Record<string, string>;
+  envVars?: string[];
   files: Array<{ path: string; content: string }>;
 }
 
+interface ModulesRegistry {
+  categories: string[];
+  modules: Record<string, ModuleBlock[]>;
+}
+
+/**
+ * Recursively find directories containing _meta.yaml files
+ */
+async function findMetaFiles(dir: string): Promise<string[]> {
+  const results: string[] = [];
+  const entries = await fs.readdir(dir);
+  for (const entry of entries) {
+    const fullPath = path.join(dir, entry);
+    const stat = await fs.stat(fullPath);
+    if (stat.isDirectory()) {
+      const metaPath = path.join(fullPath, "_meta.yaml");
+      if (await fs.pathExists(metaPath)) {
+        results.push(fullPath);
+      } else {
+        results.push(...(await findMetaFiles(fullPath)));
+      }
+    }
+  }
+  return results;
+}
+
+/**
+ * Build a module block from a directory containing _meta.yaml
+ */
+async function buildModuleBlock(
+  modulePath: string,
+  category: string,
+): Promise<ModuleBlock | null> {
+  const metaPath = path.join(modulePath, "_meta.yaml");
+
+  if (!(await fs.pathExists(metaPath))) {
+    return null;
+  }
+
+  const metaContent = await fs.readFile(metaPath, "utf-8");
+  const meta = yaml.load(metaContent) as any;
+
+  const moduleBlock: ModuleBlock = {
+    name: meta.name || path.basename(modulePath),
+    description: meta.description || "",
+    category,
+    framework: meta.framework,
+    version: meta.version,
+    dependencies: [...(meta.dependencies || [])],
+    devDependencies: [...(meta.devDependencies || [])],
+    scripts: meta.scripts,
+    envVars: [...(meta.envVars || [])],
+    files: [],
+  };
+
+  // Process included snippets
+  if (meta.includes && Array.isArray(meta.includes)) {
+    for (const include of meta.includes) {
+      const snippetRef =
+        typeof include === "string"
+          ? { snippet: include, path: null }
+          : include;
+      const snippetPath = resolveSnippetPath(snippetRef.snippet);
+      const parsed = await parseSnippetFile(snippetPath);
+
+      if (!parsed) {
+        console.warn(`  ⚠ Snippet not found: ${snippetRef.snippet}`);
+        continue;
+      }
+
+      // Merge snippet dependencies
+      if (parsed.meta.dependencies) {
+        for (const dep of parsed.meta.dependencies) {
+          if (!moduleBlock.dependencies.includes(dep))
+            moduleBlock.dependencies.push(dep);
+        }
+      }
+      if (parsed.meta.devDependencies) {
+        for (const dep of parsed.meta.devDependencies) {
+          if (!moduleBlock.devDependencies.includes(dep))
+            moduleBlock.devDependencies.push(dep);
+        }
+      }
+
+      // Determine output path
+      let outputPath: string;
+      if (snippetRef.path) {
+        outputPath = snippetRef.path;
+      } else if (parsed.meta.files && parsed.meta.files[0]) {
+        outputPath = parsed.meta.files[0].name;
+      } else {
+        outputPath = path.basename(snippetRef.snippet, ".hbs") + ".ts";
+      }
+
+      moduleBlock.files.push({ path: outputPath, content: parsed.body });
+      console.log(
+        `    ↳ Included snippet: ${snippetRef.snippet} → ${outputPath}`,
+      );
+    }
+  }
+
+  // Collect module's own files
+  const collectFiles = async (dir: string, base: string = "") => {
+    const entries = await fs.readdir(dir);
+    for (const entry of entries) {
+      if (entry === "_meta.yaml") continue;
+      const full = path.join(dir, entry);
+      let rel = path.join(base, entry);
+      const stat = await fs.stat(full);
+      if (stat.isDirectory()) {
+        await collectFiles(full, rel);
+      } else {
+        // Strip .hbs extension from file paths
+        if (rel.endsWith(".hbs")) {
+          rel = rel.slice(0, -4);
+        }
+        moduleBlock.files.push({
+          path: rel,
+          content: await fs.readFile(full, "utf-8"),
+        });
+      }
+    }
+  };
+  await collectFiles(modulePath);
+
+  return moduleBlock;
+}
+
 async function main() {
-  console.log("Building modules registry...");
+  console.log("Building modules registry...\n");
 
   await fs.ensureDir(MODULES_OUTPUT_DIR);
 
   if (!(await fs.pathExists(MODULES_DIR))) {
     console.log("No modules directory found.");
-    await fs.writeJSON(path.join(MODULES_OUTPUT_DIR, "index.json"), [], {
-      spaces: 2,
-    });
+    const emptyRegistry: ModulesRegistry = { categories: [], modules: {} };
+    await fs.writeJSON(
+      path.join(MODULES_OUTPUT_DIR, "index.json"),
+      emptyRegistry,
+      {
+        spaces: 2,
+      },
+    );
     return;
   }
 
-  const frameworks: string[] = [];
-  const registry: Record<string, ModuleBlock[]> = {};
+  const registry: ModulesRegistry = {
+    categories: [],
+    modules: {},
+  };
 
-  const frameworkDirs = await fs.readdir(MODULES_DIR);
+  // Get category directories (auth, database, i18n, etc.)
+  const categoryDirs = await fs.readdir(MODULES_DIR);
 
-  for (const frameworkName of frameworkDirs) {
-    const frameworkPath = path.join(MODULES_DIR, frameworkName);
-    if (!(await fs.stat(frameworkPath)).isDirectory()) continue;
+  for (const categoryName of categoryDirs) {
+    const categoryPath = path.join(MODULES_DIR, categoryName);
+    if (!(await fs.stat(categoryPath)).isDirectory()) continue;
 
-    frameworks.push(frameworkName);
-    registry[frameworkName] = [];
-    console.log(`Processing framework: ${frameworkName}`);
+    registry.categories.push(categoryName);
+    registry.modules[categoryName] = [];
+    console.log(`📁 Processing category: ${categoryName}`);
 
-    async function findMetaFiles(dir: string): Promise<string[]> {
-      const results: string[] = [];
-      const entries = await fs.readdir(dir);
-      for (const entry of entries) {
-        const fullPath = path.join(dir, entry);
-        const stat = await fs.stat(fullPath);
-        if (stat.isDirectory()) {
-          const metaPath = path.join(fullPath, "_meta.yaml");
-          if (await fs.pathExists(metaPath)) {
-            results.push(fullPath);
-          } else {
-            results.push(...(await findMetaFiles(fullPath)));
-          }
-        }
-      }
-      return results;
-    }
-
-    const modulePaths = await findMetaFiles(frameworkPath);
+    // Find all module directories with _meta.yaml
+    const modulePaths = await findMetaFiles(categoryPath);
 
     for (const modulePath of modulePaths) {
-      const metaPath = path.join(modulePath, "_meta.yaml");
-      const metaContent = await fs.readFile(metaPath, "utf-8");
-      const meta = yaml.load(metaContent) as any;
+      const moduleBlock = await buildModuleBlock(modulePath, categoryName);
 
-      const relativePath = path.relative(frameworkPath, modulePath);
-      const version = relativePath.split(path.sep)[0] || "v1";
-
-      const moduleBlock: ModuleBlock = {
-        name: meta.name || path.basename(modulePath),
-        description: meta.description || "",
-        framework: frameworkName,
-        version: meta.version || version,
-        category: meta.category,
-        dependencies: [...(meta.dependencies || [])],
-        devDependencies: [...(meta.devDependencies || [])],
-        snippets: [],
-        files: [],
-      };
-
-      if (meta.snippets && Array.isArray(meta.snippets)) {
-        for (const snippetPath of meta.snippets) {
-          moduleBlock.snippets.push(snippetPath);
-          const parsed = await parseSnippetFile(
-            path.join(SNIPPETS_DIR, snippetPath),
-          );
-          if (!parsed) continue;
-
-          if (parsed.meta.dependencies) {
-            for (const dep of parsed.meta.dependencies) {
-              if (!moduleBlock.dependencies.includes(dep))
-                moduleBlock.dependencies.push(dep);
-            }
-          }
-          if (parsed.meta.devDependencies) {
-            for (const dep of parsed.meta.devDependencies) {
-              if (!moduleBlock.devDependencies.includes(dep))
-                moduleBlock.devDependencies.push(dep);
-            }
-          }
-
-          let outputPath: string;
-          if (parsed.meta.files && parsed.meta.files[0]) {
-            outputPath = parsed.meta.files[0].name;
-          } else {
-            outputPath = path.basename(snippetPath, ".hbs") + ".ts";
-          }
-
-          moduleBlock.files.push({ path: outputPath, content: parsed.body });
-          console.log(`    ↳ Included snippet: ${snippetPath} → ${outputPath}`);
-        }
+      if (moduleBlock) {
+        registry.modules[categoryName].push(moduleBlock);
+        console.log(
+          `  ✓ ${categoryName}/${moduleBlock.name} (${moduleBlock.files.length} files)`,
+        );
       }
-
-      const collectFiles = async (dir: string, base: string = "") => {
-        const entries = await fs.readdir(dir);
-        for (const entry of entries) {
-          if (entry === "_meta.yaml") continue;
-          const full = path.join(dir, entry);
-          const rel = path.join(base, entry);
-          const stat = await fs.stat(full);
-          if (stat.isDirectory()) {
-            await collectFiles(full, rel);
-          } else {
-            moduleBlock.files.push({
-              path: rel,
-              content: await fs.readFile(full, "utf-8"),
-            });
-          }
-        }
-      };
-      await collectFiles(modulePath);
-
-      registry[frameworkName].push(moduleBlock);
-      console.log(
-        `  ✓ ${frameworkName}/${moduleBlock.name} (${moduleBlock.files.length} files)`,
-      );
     }
+  }
 
+  // Write the full registry
+  await fs.writeJSON(path.join(MODULES_OUTPUT_DIR, "index.json"), registry, {
+    spaces: 2,
+  });
+
+  // Also write per-category files for easier fetching
+  for (const category of registry.categories) {
     await fs.writeJSON(
-      path.join(MODULES_OUTPUT_DIR, `${frameworkName}.json`),
-      registry[frameworkName],
+      path.join(MODULES_OUTPUT_DIR, `${category}.json`),
+      registry.modules[category],
       { spaces: 2 },
     );
   }
 
-  await fs.writeJSON(path.join(MODULES_OUTPUT_DIR, "index.json"), frameworks, {
-    spaces: 2,
-  });
-  console.log(`\nModules registry built successfully!`);
+  console.log(`\n✓ Modules registry built successfully!`);
+  console.log(`  Categories: ${registry.categories.join(", ")}`);
 }
 
 main().catch(console.error);
