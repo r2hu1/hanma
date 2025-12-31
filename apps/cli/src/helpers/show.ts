@@ -1,6 +1,5 @@
 import chalk from "chalk";
-import { RegistryItem } from "../schema";
-import { TemplateRegistry } from "../types";
+import { RegistryItem, TemplateRegistry } from "../types";
 
 /**
  * Display snippets in a table format
@@ -235,8 +234,6 @@ export function displayTemplatesList(
   };
 
   displayCategory("Base", registry.base);
-  displayCategory("Database", registry.database);
-  displayCategory("Auth", registry.auth);
   displayCategory("Features", registry.features);
   displayCategory("Presets", registry.presets);
 }
