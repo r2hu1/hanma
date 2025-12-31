@@ -3,3 +3,4 @@ export * from "./config";
 export * from "./install";
 export * from "./init-config";
 export * from "./get-user-pkg-manager";
+export * from "./shared";
