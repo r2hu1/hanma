@@ -29,6 +29,8 @@ const Docs = () => {
     addonsData,
     modulesData,
     loading,
+    activeFramework,
+    activeCategory,
     setActiveCategory,
     setActiveFramework,
     fetchSnippetsData,
@@ -37,32 +39,55 @@ const Docs = () => {
     fetchModulesData,
   } = useDocsStore();
 
-  // Sync URL state to Zustand store
+  // Optimize: Consolidate effects and check before updating
   useEffect(() => {
-    setActiveFramework(urlState.framework);
-    if (urlState.category) {
-      setActiveCategory(urlState.category);
+    // 1. Sync Store with URL
+    const { framework, category, tab } = urlState;
+    if (activeFramework !== framework) {
+      setActiveFramework(framework);
     }
-  }, [
-    urlState.framework,
-    urlState.category,
-    setActiveFramework,
-    setActiveCategory,
-  ]);
+    if (category && activeCategory !== category) {
+      setActiveCategory(category);
+    }
 
-  // Fetch data based on URL state
-  useEffect(() => {
+    // 2. Fetch data if needed
     const fetchMap: Record<string, () => Promise<void>> = {
-      snippets: () => fetchSnippetsData(urlState.framework),
-      templates: () => fetchTemplatesData(urlState.framework),
-      addons: fetchAddonsData,
-      modules: fetchModulesData,
+      snippets: () => {
+        if (!snippetsData || snippetsData.framework !== framework) {
+          return fetchSnippetsData(framework);
+        }
+        return Promise.resolve();
+      },
+      templates: () => {
+        // Templates might be loaded but for a different framework?
+        // Current implementation of fetchTemplatesData checks cache internally,
+        // so calling it is safe, but we can avoid the call if we know the data is already there.
+        // However, templatesData doesn't explicitly store 'framework' in the root object
+        // in the current type definition (it just has title/desc).
+        // We rely on the store's internal cache check.
+        return fetchTemplatesData(framework);
+      },
+      addons: () => {
+        if (!addonsData) return fetchAddonsData();
+        return Promise.resolve();
+      },
+      modules: () => {
+        if (!modulesData) return fetchModulesData();
+        return Promise.resolve();
+      },
     };
 
-    fetchMap[urlState.tab]?.();
+    fetchMap[tab]?.();
   }, [
-    urlState.tab,
-    urlState.framework,
+    urlState,
+    activeFramework,
+    activeCategory,
+    snippetsData,
+    templatesData,
+    addonsData,
+    modulesData,
+    setActiveFramework,
+    setActiveCategory,
     fetchSnippetsData,
     fetchTemplatesData,
     fetchAddonsData,

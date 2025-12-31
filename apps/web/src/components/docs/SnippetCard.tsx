@@ -1,18 +1,18 @@
-import { memo, useState } from "react";
+import { memo } from "react";
 import clsx from "clsx";
 import type { SnippetDoc, FrameworkType } from "@/types/docs";
 import { CodeBlock } from "./CodeBlock";
 import { CodeViewer } from "./CodeViewer";
+import { useUIStore } from "@/stores";
 
 interface SnippetCardProps {
   snippet: SnippetDoc;
   framework: FrameworkType | "shared" | "tooling";
 }
 
-type ViewMode = "about" | "code";
-
 const SnippetCardComponent = ({ snippet, framework }: SnippetCardProps) => {
-  const [viewMode, setViewMode] = useState<ViewMode>("about");
+  const { setSnippetViewMode, getSnippetViewMode } = useUIStore();
+  const viewMode = getSnippetViewMode(snippet.name);
 
   return (
     <div className="border border-border rounded-xl bg-surface overflow-hidden">
@@ -30,7 +30,7 @@ const SnippetCardComponent = ({ snippet, framework }: SnippetCardProps) => {
           {/* View Mode Toggle */}
           <div className="flex gap-1 bg-border/50 rounded-full p-1">
             <button
-              onClick={() => setViewMode("about")}
+              onClick={() => setSnippetViewMode(snippet.name, "about")}
               className={clsx(
                 "px-3 py-1 rounded-full text-sm font-medium transition-all",
                 viewMode === "about"
@@ -41,7 +41,7 @@ const SnippetCardComponent = ({ snippet, framework }: SnippetCardProps) => {
               About
             </button>
             <button
-              onClick={() => setViewMode("code")}
+              onClick={() => setSnippetViewMode(snippet.name, "code")}
               className={clsx(
                 "px-3 py-1 rounded-full text-sm font-medium transition-all",
                 viewMode === "code"

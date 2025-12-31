@@ -1,13 +1,14 @@
-import { useState } from "react";
+import { useUIStore } from "@/stores";
 import type { Template } from "@/types/docs";
 
 export const FeatureTemplateCard = ({ template }: { template: Template }) => {
-  const [expanded, setExpanded] = useState(false);
-  
+  const { toggleCardExpanded, isCardExpanded } = useUIStore();
+  const expanded = isCardExpanded(template.id);
+
   return (
     <div
       className="border border-border rounded-lg p-4 bg-surface hover:border-foreground/20 transition-colors cursor-pointer"
-      onClick={() => setExpanded(!expanded)}
+      onClick={() => toggleCardExpanded(template.id)}
     >
       <div className="flex items-start justify-between">
         <div>
