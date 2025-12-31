@@ -49,7 +49,7 @@ const CodeViewerComponent = ({ snippetId, framework }: CodeViewerProps) => {
         setSourceCode(code);
 
         // Highlighting logic stays exactly the same
-        const html = await highlightCode(code, "typescript");
+        const html = await highlightCode(code, "typescript", "github-dark");
         setHighlightedHtml(html);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to load source");

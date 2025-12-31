@@ -34,7 +34,7 @@ const SnippetCardComponent = ({ snippet, framework }: SnippetCardProps) => {
               className={clsx(
                 "px-3 py-1 rounded-full text-sm font-medium transition-all",
                 viewMode === "about"
-                  ? "bg-primary text-white shadow-sm"
+                  ? "bg-primary text-primary-foreground shadow-sm"
                   : "text-muted hover:text-foreground",
               )}
             >
@@ -45,7 +45,7 @@ const SnippetCardComponent = ({ snippet, framework }: SnippetCardProps) => {
               className={clsx(
                 "px-3 py-1 rounded-full text-sm font-medium transition-all",
                 viewMode === "code"
-                  ? "bg-primary text-white shadow-sm"
+                  ? "bg-primary text-primary-foreground shadow-sm"
                   : "text-muted hover:text-foreground",
               )}
             >
