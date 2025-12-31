@@ -7,10 +7,10 @@
  * - HANMA_BASE_URL: Override both (if specific URLs not set)
  */
 
-// Production base URL
 const PRODUCTION_BASE_URL = "https://hanma-a2n.pages.dev";
+// const PRODUCTION_BASE_URL = "http://localhost:5173";
 
-// Allow full override or use production
+// Default to production, only use local if explicitly in dev mode
 const BASE_URL = process.env.HANMA_BASE_URL || PRODUCTION_BASE_URL;
 
 /**
@@ -26,6 +26,12 @@ export const TEMPLATES_URL =
   process.env.HANMA_TEMPLATES_URL || `${BASE_URL}/templates`;
 
 /**
+ * Modules URL for fetching modules (auth, database, etc.)
+ */
+export const MODULES_URL =
+  process.env.HANMA_MODULES_URL || `${BASE_URL}/modules`;
+
+/**
  * Docs URL for fetching documentation
  */
 export const DOCS_URL = process.env.HANMA_DOCS_URL || `${BASE_URL}/docs`;
@@ -33,4 +39,4 @@ export const DOCS_URL = process.env.HANMA_DOCS_URL || `${BASE_URL}/docs`;
 /**
  * CLI Version
  */
-export const VERSION = "0.1.0";
+export const VERSION = "0.2.0";

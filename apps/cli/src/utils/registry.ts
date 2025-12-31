@@ -1,6 +1,6 @@
 import { registrySchema } from "../schemas/registry";
-import { REGISTRY_URL, TEMPLATES_URL } from "../constants";
-import { Registry, TemplateRegistry } from "../types";
+import { REGISTRY_URL, TEMPLATES_URL, MODULES_URL } from "../constants";
+import { Registry, TemplateRegistry, ModulesRegistry } from "../types";
 
 /**
  * Generic fetcher for registry data
@@ -57,10 +57,13 @@ export async function fetchTemplatesRegistry(
     // Filter templates by framework - keep templates that either:
     // 1. Have no framework specified (shared templates)
     // 2. Match the selected framework
+    // 3. If no framework filter is provided, keep all items
     const filterByFramework = <T extends { framework?: string }>(
       items: T[] | undefined,
     ): T[] => {
       if (!items) return [];
+      // If no framework specified, return all items
+      if (!framework) return items;
       return items.filter(
         (item) => !item.framework || item.framework === framework,
       );
@@ -68,12 +71,25 @@ export async function fetchTemplatesRegistry(
 
     return {
       base: filterByFramework(fullRegistry.base),
-      database: filterByFramework(fullRegistry.database),
-      auth: filterByFramework(fullRegistry.auth),
       features: filterByFramework(fullRegistry.features),
       presets: filterByFramework(fullRegistry.presets),
       extra: filterByFramework(fullRegistry.extra),
     };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Fetch modules registry (auth, database, etc.)
+ */
+export async function fetchModulesRegistry(): Promise<ModulesRegistry | null> {
+  try {
+    const res = await fetch(`${MODULES_URL}/index.json`);
+    if (!res.ok) {
+      return null;
+    }
+    return (await res.json()) as ModulesRegistry;
   } catch {
     return null;
   }

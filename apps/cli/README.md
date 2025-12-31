@@ -1,318 +1,141 @@
-# Hanma CLI
+# ⚔️ Hanma CLI
 
 <p align="center">
-  <strong>Grapple your backend into shape with production-ready snippets and templates.</strong>
+  <strong>Grapple your backend into shape with production-ready snippets, modules, and composable templates.</strong>
 </p>
 
 <p align="center">
-  <a href="https://www.npmjs.com/package/hanma"><img src="https://img.shields.io/npm/v/hanma.svg" alt="npm version"></a>
-  <a href="https://www.npmjs.com/package/hanma"><img src="https://img.shields.io/npm/dm/hanma.svg" alt="npm downloads"></a>
-  <a href="https://github.com/itstheanurag/hanma/blob/main/LICENSE"><img src="https://img.shields.io/npm/l/hanma.svg" alt="license"></a>
+  <a href="https://www.npmjs.com/package/hanma"><img src="https://img.shields.io/npm/v/hanma.svg?style=flat-square&color=ea580c" alt="npm version"></a>
+  <a href="https://www.npmjs.com/package/hanma"><img src="https://img.shields.io/npm/dm/hanma.svg?style=flat-square&color=ea580c" alt="npm downloads"></a>
+  <a href="https://github.com/itstheanurag/hanma/blob/main/LICENSE"><img src="https://img.shields.io/npm/l/hanma.svg?style=flat-square" alt="license"></a>
+  <a href="https://hanma-a2n.pages.dev/docs"><img src="https://img.shields.io/badge/docs-vibrant-ea580c?style=flat-square" alt="documentation"></a>
 </p>
 
 ---
 
-## What is Hanma?
+## ✨ What is Hanma?
 
-Hanma is a CLI tool that helps you quickly scaffold backend projects and add production-ready code snippets. Instead of copy-pasting boilerplate code, use Hanma to:
+**Hanma** is a specialized CLI engine designed to eliminate the tedious "boilerplate phase" of backend development. Inspired by tools like shadcn/ui but built for the **server-side**, Hanma doesn't provide a library; it provides **source code**.
 
-- **Create new projects** with pre-configured frameworks (Express, Hono, Elysia)
-- **Add snippets** for common functionality (auth, database, uploads, etc.)
-- **Add modules** for complex multi-file features
-- **Zero lock-in** - all code is added directly to your project
+### Why Hanma?
 
-## Quick Start
-
-```bash
-# Create a new project
-npx hanma create my-api
-
-# Or install globally
-npm install -g hanma
-hanma create my-api
-```
-
-## Installation
-
-### Using npx (recommended for one-off use)
-
-```bash
-npx hanma <command>
-```
-
-### Global Installation
-
-```bash
-# npm
-npm install -g hanma
-
-# pnpm
-pnpm add -g hanma
-
-# yarn
-yarn global add hanma
-
-# bun
-bun add -g hanma
-```
-
-### Verify Installation
-
-```bash
-hanma --version
-hanma --help
-```
-
-## Commands
-
-### `create` - Scaffold a New Project
-
-Create a new backend project with your choice of framework, database, auth, and more.
-
-```bash
-# Interactive mode (recommended)
-npx hanma create my-api
-
-# With flags
-npx hanma create my-api --framework express --database drizzle-postgres --auth jwt-auth
-```
-
-#### Available Frameworks
-
-| Framework | Description |
-|-----------|-------------|
-| `express` | Express.js v5 with TypeScript |
-| `express-graphql` | Express + Apollo GraphQL |
-| `express-trpc` | Express + tRPC |
-| `express-socket` | Express + Socket.io |
-| `hono` | Hono framework (Node.js) |
-| `hono-bun` | Hono optimized for Bun |
-| `hono-cloudflare` | Hono for Cloudflare Workers |
-| `hono-vercel` | Hono for Vercel Edge |
-| `hono-deno` | Hono for Deno |
-| `hono-lambda` | Hono for AWS Lambda |
-| `elysia` | Elysia framework for Bun |
-
-#### Available Databases
-
-| Database | Description |
-|----------|-------------|
-| `drizzle-postgres` | Drizzle ORM + PostgreSQL |
-| `drizzle-mysql` | Drizzle ORM + MySQL |
-| `drizzle-sqlite` | Drizzle ORM + SQLite |
-| `prisma-postgres` | Prisma ORM + PostgreSQL |
-| `mongodb` | MongoDB native driver |
-
-#### Available Auth Options
-
-| Auth | Description |
-|------|-------------|
-| `better-auth` | Better Auth library |
-| `jwt-auth` | Custom JWT authentication |
-| `passport-local` | Passport.js local strategy |
-
-#### Create Command Options
-
-| Option | Description |
-|--------|-------------|
-| `--framework <fw>` | Base framework |
-| `--database <db>` | Database setup |
-| `--auth <auth>` | Authentication method |
-| `--mailer <mailer>` | Email provider (nodemailer, resend, sendgrid, aws-ses) |
-| `--upload <upload>` | File uploads (s3, cloudinary, local, r2, gcp) |
-| `--cache <cache>` | Caching (redis) |
-| `--logging <log>` | Logging (winston) |
-| `--monitoring <mon>` | Monitoring (sentry) |
-| `--preset <preset>` | Security preset (security-basic, security-strict) |
-| `--tooling <tool>` | Linting/formatting (biome, eslint, prettier) |
-| `--pm <pm>` | Package manager (npm, pnpm, yarn, bun) |
-| `--skip-install` | Skip dependency installation |
+- **Zero Lock-in**: You own the code. Once added, it's just local files in your project. No runtime dependencies on Hanma.
+- **Composable Architecture**: Mix and match templates. Need Express with Drizzle, Clerk Auth, and Socket.io? Hanma builds it for you.
+- **Framework Aware**: Hanma understands whether you're using Express, Hono, or Elysia and adapts the code it gives you accordingly.
+- **Production Grade**: Every snippet and module following industry best practices for security, types, and structure.
 
 ---
 
-### `add` - Add Snippets
+## 🏗️ Core Concepts
 
-Add individual code snippets to your existing project.
+To get the most out of Hanma, it helps to understand the three types of code it provides:
 
-```bash
-# Interactive mode
-npx hanma add
+### 1. Composable Templates (`create`)
 
-# Add specific snippets
-npx hanma add cors jwt rate-limiter
+Scaffolding a project isn't just picking a framework. It's picking a *stack*. The `create` command uses a composable engine that stitches together base frameworks with database ORMs, auth handlers, and middleware setups during initialization.
 
-# Filter by category
-npx hanma add --category middleware
+### 2. Modules (`module`)
 
-# Add all snippets in a category
-npx hanma add --all --category utils
-```
+A module is a complex, multi-file feature. Adding a "Better Auth" module doesn't just add one file; it adds routes, middleware, types, and schema files, ensuring everything is wired up correctly from the start.
 
-#### Add Command Options
+### 3. Snippets (`add`)
 
-| Option | Description |
-|--------|-------------|
-| `-a, --all` | Add all snippets (use with `--category`) |
-| `-c, --category <cat>` | Filter by category |
-| `-f, --framework <fw>` | Framework to use (express, hono, elysia) |
-| `-v, --version <ver>` | Framework version |
-| `-p, --path <path>` | Destination path |
+The building blocks. Individual files or functions for specific tasks—CORS setup, JWT utilities, validation schemas, or custom error handlers.
 
 ---
 
-### `module` - Add Modules
-
-Add multi-file modules for complex features.
+## 🚀 Quick Start
 
 ```bash
-# Interactive mode
-npx hanma module
+# Start the interactive project builder
+npx hanma create my-project
 
-# Add specific modules
-npx hanma module auth-jwt
-npx hanma mod auth-jwt  # 'mod' is an alias
-```
-
-#### Module Command Options
-
-| Option | Description |
-|--------|-------------|
-| `-f, --framework <fw>` | Framework to use |
-| `-v, --version <ver>` | Framework version |
-| `-p, --path <path>` | Destination path |
-
----
-
-### `show` - View Available Snippets & Templates
-
-Browse available snippets and templates without adding them to your project.
-
-```bash
-# Show all snippets for a framework
-npx hanma show snippets --framework express
-
-# Show details for a specific snippet
-npx hanma show snippets cors --framework express
-
-# Show available templates
-npx hanma show templates --framework hono
-
-# Output as JSON (for scripting)
-npx hanma show snippets --framework express --json
-```
-
-#### Show Command Options
-
-| Option | Description |
-|--------|-------------|
-| `-f, --framework <fw>` | Framework to use (express, hono, elysia, fastify, shared) |
-| `--json` | Output in JSON format |
-
----
-
-### `init` - Initialize Configuration
-
-Create a `hanma.json` configuration file in your project.
-
-```bash
-npx hanma init
-```
-
-This creates a config file that stores your project defaults:
-
-```json
-{
-  "componentsPath": "src",
-  "utilsPath": "src/utils",
-  "framework": "express"
-}
-```
-
----
-
-## Examples
-
-### Create a Full-Featured Express API
-
-```bash
-npx hanma create my-api \
-  --framework express \
-  --database drizzle-postgres \
-  --auth jwt-auth \
-  --mailer resend \
-  --upload s3 \
-  --cache redis \
-  --preset security-strict \
-  --tooling biome
-```
-
-### Create a Hono API for Cloudflare Workers
-
-```bash
-npx hanma create worker-api --framework hono-cloudflare
-```
-
-### Create an Elysia API for Bun
-
-```bash
-npx hanma create bun-api --framework elysia --database drizzle-sqlite
-```
-
-### Add JWT Auth to Existing Project
-
-```bash
+# Add a module to an existing project
 cd my-project
-npx hanma add jwt-auth
+npx hanma mod drizzle-postgres
+
+# Inject a specific utility snippet
+npx hanma add logger
 ```
 
 ---
 
-## Available Snippet Categories
+## 📖 Detailed Command Reference
 
-| Category | Examples |
-|----------|----------|
-| **Middleware** | cors, rate-limiter, helmet, compression |
-| **Auth** | jwt-auth, passport, session |
-| **Database** | drizzle, prisma, mongodb |
-| **Utils** | logger, validation, error-handler |
-| **Uploads** | s3, cloudinary, multer, r2 |
-| **Mailers** | nodemailer, resend, sendgrid, ses |
-| **Caching** | redis |
+### `create [name]`
+
+The entry point for new projects.
+
+| Flag | Description |
+|:---|:---|
+| `--framework <fw>` | Force a specific framework (e.g., `express`, `hono`, `elysia`) |
+| `--database <db>` | Pre-select database (e.g., `drizzle-postgres`, `prisma-mysql`) |
+| `--auth <auth>` | Pre-select auth provider (e.g., `better-auth`, `clerk`, `jwt`) |
+| `--pm <package-manager>` | Default to `pnpm`, `npm`, `yarn`, or `bun` |
+| `--skip-install` | Scaffold only, don't run the installer |
+
+### `add [snippets...]`
+
+Smart snippet injection. Hanma reads your `hanma.json` to ensure you get the right code for your framework.
+
+```bash
+# Multi-select interactively (recommened)
+hanma add
+
+# Category filtered select
+hanma add --category middleware
+```
+
+### `show <type> [name]`
+
+The Discovery Engine. Browse the registry without leaving your terminal.
+
+- `hanma show snippets`: List all snippets for your detected framework.
+- `hanma show templates`: Browse the scaffolding library.
+- `hanma show modules`: See complex multi-file features.
+- `hanma show tooling`: Browse dev-tools configurations.
 
 ---
 
-## Configuration
+## 📋 Compatibility Matrix
 
-Hanma uses a `hanma.json` file for project configuration:
+Hanma is designed to grow. Here is the current state of support:
+
+| Feature Area | Express | Hono | Elysia | Fastify |
+|:---|:---:|:---:|:---:|:---:|
+| Core Scaffolding | ✅ | ✅ | ✅ | 🚧 |
+| Snippet Library | ✅ | ✅ | ✅ | ✅ |
+| Auth Modules | ✅ | ✅ | ✅ | 🚧 |
+| DB Integrations | ✅ | ✅ | ✅ | ✅ |
+| Tooling (Biome, etc) | ✅ | ✅ | ✅ | ✅ |
+
+---
+
+## ⚙️ How it Works: `hanma.json`
+
+When you run `hanma init` or `hanma create`, a small configuration file is created. This is the **brain** of the CLI—it keeps Hanma "framework aware".
 
 ```json
 {
+  "framework": "express",
   "componentsPath": "src",
-  "utilsPath": "src/utils",
-  "framework": "express"
+  "utilsPath": "src/utils"
 }
 ```
 
-| Field | Description | Default |
-|-------|-------------|---------|
-| `componentsPath` | Where to add components | `src` |
-| `utilsPath` | Where to add utilities | `src/utils` |
-| `framework` | Default framework | auto-detected |
+- **Framework Awareness**: When you run `hanma add cors`, Hanma checks this file. If it's `express`, it fetches the Express middleware. If it's `hono`, it fetches the Hono version.
+- **Custom Paths**: Tired of `src/`? Change `componentsPath` to `./lib` and Hanma will respect it.
 
 ---
 
-## Documentation
+## 🌐 Documentation & Resources
 
-For full documentation, visit: **[hanma-a2n.pages.dev](https://hanma-a2n.pages.dev)**
-
----
-
-## Contributing
-
-Contributions are welcome! Please see our [GitHub repository](https://github.com/itstheanurag/hanma).
+- **Full Documentation**: [hanma-a2n.pages.dev/docs](https://hanma-a2n.pages.dev/docs)
+- **Code Patterns**: View the source of snippets at our [Web Registry](https://hanma-a2n.pages.dev/registry).
+- **GitHub**: [itstheanurag/hanma](https://github.com/itstheanurag/hanma)
 
 ---
 
-## License
+## 📄 License
 
 MIT © [Gaurav Kumar](https://github.com/itstheanurag)

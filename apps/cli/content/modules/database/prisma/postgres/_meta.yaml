@@ -6,6 +6,8 @@ framework: express
 includes:
   - snippet: shared/db/prisma-client.hbs
     path: src/libs/db/prisma.ts
+  - snippet: shared/queries/prisma-storage.hbs
+    path: src/libs/db/storage.ts
 
 dependencies:
   - "@prisma/client"

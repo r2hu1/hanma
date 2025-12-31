@@ -26,11 +26,27 @@ export interface TemplateBlock {
 
 export interface TemplateRegistry {
   base: TemplateBlock[];
-  database: TemplateBlock[];
-  auth: TemplateBlock[];
   features?: TemplateBlock[];
   presets?: TemplateBlock[];
   extra?: TemplateBlock[];
+}
+
+export interface ModuleBlock {
+  name: string;
+  description: string;
+  category: string;
+  framework?: string;
+  version?: string;
+  dependencies: string[];
+  devDependencies: string[];
+  scripts?: Record<string, string>;
+  envVars?: string[];
+  files: TemplateFile[];
+}
+
+export interface ModulesRegistry {
+  categories: string[];
+  modules: Record<string, ModuleBlock[]>;
 }
 
 export interface CollectedBlockData {

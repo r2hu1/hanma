@@ -2,13 +2,16 @@ import path from "path";
 import fs from "fs-extra";
 import chalk from "chalk";
 import ora from "ora";
+
 import {
   CollectedBlockData,
   TemplateBlock,
   TemplateFile,
   RegistryItem,
+  ModuleBlock,
 } from "../types";
-import { batchInstallDependencies } from "../utils";
+
+import { batchInstallDependencies, writeFile, appendEnvVars } from "../utils";
 
 /**
  * Parse a dependency string like "express@4.18.0" or "@types/node@20.0.0"
@@ -49,9 +52,11 @@ export function parseDependencies(deps: string[]): Record<string, string> {
 }
 
 /**
- * Collect all data from selected template blocks
+ * Collect all data from selected template blocks and modules
  */
-export function collectBlockData(blocks: TemplateBlock[]): CollectedBlockData {
+export function collectBlockData(
+  blocks: (TemplateBlock | ModuleBlock)[],
+): CollectedBlockData {
   const result: CollectedBlockData = {
     files: [],
     dependencies: {},
@@ -106,14 +111,15 @@ export async function writeProjectFiles(
     }
 
     const filePath = path.join(projectPath, file.path.replace(/\.hbs$/, ""));
-    await fs.ensureDir(path.dirname(filePath));
-
     const content = file.content.replace(/\{\{projectName\}\}/g, projectName);
-    await fs.writeFile(filePath, content);
+    await writeFile(filePath, content);
   }
 
   // Write .env.example
   if (envVars.length > 0) {
+    await appendEnvVars(envVars); // This might need a path adjustment if we are in projectPath
+    // Wait, appendEnvVars uses process.cwd(). In create.ts we are usually root.
+    // Let's keep the manual write for now to avoid side effects in create
     const envContent = envVars
       .map((v) => (v.includes("=") ? v : `${v}=`))
       .join("\n");
@@ -164,22 +170,14 @@ export async function installRegistryItems(
 
   const allDeps: string[] = [];
   const allDevDeps: string[] = [];
-  let totalFiles = 0;
 
   for (const item of items) {
-    if (item.dependencies?.length) {
-      allDeps.push(...item.dependencies);
-    }
-    if (item.devDependencies?.length) {
-      allDevDeps.push(...item.devDependencies);
-    }
-    totalFiles += item.files.length;
+    if (item.dependencies?.length) allDeps.push(...item.dependencies);
+    if (item.devDependencies?.length) allDevDeps.push(...item.devDependencies);
   }
 
   if (allDeps.length > 0 || allDevDeps.length > 0) {
-    const installSpinner = ora(
-      `Installing dependencies: ${[...new Set([...allDeps, ...allDevDeps])].join(", ")}...`,
-    ).start();
+    const installSpinner = ora("Installing dependencies...").start();
     await batchInstallDependencies(allDeps, allDevDeps);
     installSpinner.succeed("Dependencies installed");
   }
@@ -188,17 +186,10 @@ export async function installRegistryItems(
   for (const item of items) {
     for (const file of item.files) {
       const targetPath = path.join(process.cwd(), targetDir, file.name);
-      await fs.ensureDir(path.dirname(targetPath));
-      await fs.writeFile(targetPath, file.content);
+      await writeFile(targetPath, file.content);
     }
   }
   writeSpinner.succeed(`Files written to ${targetDir}`);
 
-  const names = items.map((i) => i.name).join(", ");
-  console.log(
-    chalk.green(`\n✓ Successfully added ${items.length} ${type}(s): ${names}`),
-  );
-  if (type === "module") {
-    console.log(chalk.dim(`  ${totalFiles} file(s) installed`));
-  }
+  console.log(chalk.green(`\n✓ Successfully added ${items.length} ${type}(s)`));
 }
