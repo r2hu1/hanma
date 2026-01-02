@@ -11,7 +11,7 @@ import {
 } from "./utils";
 
 // Framework snippets only - shared and tooling handled separately
-const FRAMEWORKS = ["express", "hono", "elysia", "fastify"];
+const FRAMEWORKS = ["express", "hono", "elysia", "fastify", "nest"];
 
 /**
  * Extract sources from a directory
