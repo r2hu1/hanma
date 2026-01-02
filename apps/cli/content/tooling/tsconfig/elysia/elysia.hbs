@@ -1,0 +1,20 @@
+---
+name: tsconfig-elysia
+description: TypeScript configuration for Elysia projects
+devDependencies:
+  - typescript
+files:
+  - name: tsconfig.json
+---
+{
+  "compilerOptions": {
+    "target": "ES2021",                                  
+    "module": "ES2022",                                
+    "moduleResolution": "node",                      
+    "types": ["bun-types"],                                     
+    "esModuleInterop": true,                             
+    "forceConsistentCasingInFileNames": true,            
+    "strict": true,                                      
+    "skipLibCheck": true                             
+  }
+}

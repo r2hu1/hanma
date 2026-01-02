@@ -1,0 +1,122 @@
+{
+  "id": "decorators",
+  "title": "Decorators",
+  "description": "Custom decorators for controllers and methods",
+  "subcategories": [
+    {
+      "id": "auth-decorators",
+      "title": "Authentication",
+      "description": "Decorators for authentication and authorization",
+      "snippets": [
+        {
+          "id": "current-user",
+          "name": "current-user",
+          "displayName": "Current User",
+          "description": "Extract authenticated user from request",
+          "purpose": "Get the current user in controllers without accessing the raw request object.",
+          "features": [
+            "Extract full user object",
+            "Extract specific property",
+            "Type-safe user data",
+            "Null handling"
+          ],
+          "usage": "@Get('profile')\ngetProfile(@CurrentUser() user: CurrentUserData) {\n  return user;\n}",
+          "output": "src/decorators/current-user.decorator.ts",
+          "dependencies": [],
+          "command": "npx hanma add current-user --framework nest"
+        },
+        {
+          "id": "roles",
+          "name": "roles",
+          "displayName": "Roles Decorator",
+          "description": "Role-based access control decorator",
+          "purpose": "Mark routes with required roles. Works with RolesGuard for authorization.",
+          "features": [
+            "Role enum included",
+            "Single role requirement",
+            "Multiple roles (OR logic)",
+            "All roles (AND logic)"
+          ],
+          "usage": "@Roles(Role.ADMIN)\n@Get('admin')\nadminRoute() {}",
+          "output": "src/decorators/roles.decorator.ts",
+          "dependencies": [],
+          "command": "npx hanma add roles --framework nest"
+        },
+        {
+          "id": "public",
+          "name": "public",
+          "displayName": "Public Route",
+          "description": "Mark routes as public to skip auth",
+          "purpose": "Bypass authentication guards for public endpoints like health checks.",
+          "features": [
+            "Skip auth guards",
+            "Works with global guards",
+            "Simple metadata decorator"
+          ],
+          "usage": "@Public()\n@Get('health')\nhealthCheck() {}",
+          "output": "src/decorators/public.decorator.ts",
+          "dependencies": [],
+          "command": "npx hanma add public --framework nest"
+        },
+        {
+          "id": "auth",
+          "name": "auth",
+          "displayName": "Auth Decorator",
+          "description": "Combined authentication decorator",
+          "purpose": "Apply JWT auth guard and optional roles in a single decorator.",
+          "features": [
+            "JWT + Roles combined",
+            "Swagger integration",
+            "AdminOnly shortcut",
+            "ModeratorOnly shortcut"
+          ],
+          "usage": "@Auth(Role.ADMIN)\n@Get('admin')\nadminRoute() {}",
+          "output": "src/decorators/auth.decorator.ts",
+          "dependencies": [],
+          "command": "npx hanma add auth --framework nest"
+        }
+      ]
+    },
+    {
+      "id": "api-decorators",
+      "title": "API",
+      "description": "Decorators for API documentation and messaging",
+      "snippets": [
+        {
+          "id": "api-response",
+          "name": "api-response",
+          "displayName": "API Response",
+          "description": "Swagger response decorators",
+          "purpose": "Consistent Swagger documentation for paginated responses and errors.",
+          "features": [
+            "Paginated response decorator",
+            "Success response wrapper",
+            "Common error responses",
+            "Type-safe schemas"
+          ],
+          "usage": "@ApiPaginatedResponse(UserDto)\n@Get()\nfindAll() {}",
+          "output": "src/decorators/api-response.decorator.ts",
+          "dependencies": ["@nestjs/swagger"],
+          "command": "npx hanma add api-response --framework nest"
+        },
+        {
+          "id": "message",
+          "name": "message",
+          "displayName": "Message Patterns",
+          "description": "Enhanced microservice message decorators",
+          "purpose": "Add metadata to message patterns for documentation and versioning.",
+          "features": [
+            "Message with metadata",
+            "Event patterns",
+            "Versioned messages",
+            "Deprecated patterns"
+          ],
+          "usage": "@Message('user.create', { description: 'Creates user' })\ncreateUser(@Payload() data: CreateUserDto) {}",
+          "output": "src/decorators/message.decorator.ts",
+          "dependencies": ["@nestjs/microservices"],
+          "command": "npx hanma add message --framework nest"
+        }
+      ]
+    }
+  ]
+}

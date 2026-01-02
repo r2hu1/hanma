@@ -8,6 +8,8 @@ version: "1"
 includes:
   - snippet: elysia/v1/libs/servers/elysia-basic.hbs
     path: src/libs/server.ts
+  - snippet: tooling/tsconfig/elysia/elysia.hbs
+    path: tsconfig.json
     
 dependencies:
   - elysia

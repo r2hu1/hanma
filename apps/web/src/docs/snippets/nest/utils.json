@@ -1,0 +1,89 @@
+{
+  "id": "utils",
+  "title": "Utilities",
+  "description": "Standalone utility functions",
+  "subcategories": [
+    {
+      "id": "data-utils",
+      "title": "Data Utilities",
+      "description": "Helpers for data processing",
+      "snippets": [
+        {
+          "id": "pagination",
+          "name": "pagination",
+          "displayName": "Pagination Helpers",
+          "description": "Offset and cursor pagination",
+          "purpose": "DTOs and helpers for both offset-based and cursor-based pagination.",
+          "features": [
+            "Offset pagination DTO",
+            "Cursor pagination DTO",
+            "Prisma helpers",
+            "Response builders"
+          ],
+          "usage": "const { data, total } = await this.service.findAll(query);\nreturn new PaginatedResponseDto(data, total, query.page, query.limit);",
+          "output": "src/utils/pagination.ts",
+          "dependencies": [],
+          "command": "npx hanma add pagination --framework nest"
+        },
+        {
+          "id": "slug",
+          "name": "slug",
+          "displayName": "Slug Generator",
+          "description": "URL-safe slug generation",
+          "purpose": "Generate URL-safe slugs with uniqueness helpers and collision avoidance.",
+          "features": [
+            "Slugify integration",
+            "Unique slugs",
+            "Timestamp slugs",
+            "Collision check factory"
+          ],
+          "usage": "const slug = await this.checkSlugAvailability(dto.title);",
+          "output": "src/utils/slug.ts",
+          "dependencies": ["slugify"],
+          "command": "npx hanma add slug --framework nest"
+        }
+      ]
+    },
+    {
+      "id": "security-utils",
+      "title": "Security",
+      "description": "Security utilities",
+      "snippets": [
+        {
+          "id": "password",
+          "name": "password",
+          "displayName": "Password Utilities",
+          "description": "Argon2 password hashing",
+          "purpose": "Secure password hashing with Argon2id. Includes strength checking and rehash detection.",
+          "features": [
+            "Argon2id hashing",
+            "OWASP configuration",
+            "Strength checking",
+            "Rehash detection"
+          ],
+          "usage": "const hash = await hashPassword(password);\nconst valid = await verifyPassword(hash, password);",
+          "output": "src/utils/password.ts",
+          "dependencies": ["argon2"],
+          "command": "npx hanma add password --framework nest"
+        },
+        {
+          "id": "crypto",
+          "name": "crypto",
+          "displayName": "Crypto Utilities",
+          "description": "Encryption and token utilities",
+          "purpose": "AES-256-GCM encryption with HMAC, token generation, and timing-safe comparison.",
+          "features": [
+            "AES-256-GCM encryption",
+            "HMAC generation",
+            "Token generation",
+            "Timing-safe compare"
+          ],
+          "usage": "const encrypted = encrypt(sensitiveData);\nconst token = generateToken();",
+          "output": "src/utils/crypto.ts",
+          "dependencies": [],
+          "command": "npx hanma add crypto --framework nest"
+        }
+      ]
+    }
+  ]
+}

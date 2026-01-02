@@ -1,0 +1,20 @@
+---
+name: tsconfig-hono
+description: TypeScript configuration for Hono projects
+devDependencies:
+  - typescript
+files:
+  - name: tsconfig.json
+---
+{
+  "compilerOptions": {
+    "strict": true,
+    "jsx": "react-jsx",
+    "jsxImportSource": "hono/jsx",
+    "baseUrl": ".",
+    "paths": {
+      "@src/*": ["./src/*"],
+      "config": ["config/index.ts"]
+    }
+  }
+}

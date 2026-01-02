@@ -1,0 +1,107 @@
+---
+name: throttle-guard
+description: Rate limiting guard with configurable limits per route or globally
+dependencies:
+  - "@nestjs/throttler"
+devDependencies: []
+files:
+  - name: guards/throttle.guard.ts
+---
+import { Injectable, ExecutionContext } from "@nestjs/common";
+import {
+  ThrottlerGuard,
+  ThrottlerException,
+  ThrottlerModuleOptions,
+} from "@nestjs/throttler";
+import { Reflector } from "@nestjs/core";
+
+// Custom metadata keys for per-route limits
+export const THROTTLE_LIMIT_KEY = "throttle_limit";
+export const THROTTLE_TTL_KEY = "throttle_ttl";
+export const SKIP_THROTTLE_KEY = "skip_throttle";
+
+@Injectable()
+export class CustomThrottlerGuard extends ThrottlerGuard {
+  constructor(
+    options: ThrottlerModuleOptions,
+    storageService: any,
+    reflector: Reflector
+  ) {
+    super(options, storageService, reflector);
+  }
+
+  // Skip throttling for certain routes
+  protected async shouldSkip(context: ExecutionContext): Promise<boolean> {
+    const skipThrottle = this.reflector.getAllAndOverride<boolean>(
+      SKIP_THROTTLE_KEY,
+      [context.getHandler(), context.getClass()]
+    );
+    return skipThrottle ?? false;
+  }
+
+  // Custom error message
+  protected throwThrottlingException(context: ExecutionContext): void {
+    const request = context.switchToHttp().getRequest();
+    throw new ThrottlerException(
+      `Too many requests. Please try again later. (IP: ${this.getTracker(request)})`
+    );
+  }
+
+  // Use IP address as tracker
+  protected getTracker(request: Record<string, any>): string {
+    return (
+      request.headers["x-forwarded-for"]?.split(",")[0] ||
+      request.ip ||
+      request.connection?.remoteAddress ||
+      "unknown"
+    );
+  }
+}
+
+// Decorator helpers for per-route rate limiting
+import { SetMetadata } from "@nestjs/common";
+
+/**
+ * Set custom throttle limit for a route.
+ * 
+ * Usage:
+ * @Throttle(5, 60) // 5 requests per 60 seconds
+ * @Post("login")
+ * login() {}
+ */
+export const Throttle = (limit: number, ttl: number) =>
+  SetMetadata("throttler", { limit, ttl });
+
+/**
+ * Skip throttling for a route.
+ * 
+ * Usage:
+ * @SkipThrottle()
+ * @Get("health")
+ * health() {}
+ */
+export const SkipThrottle = () => SetMetadata(SKIP_THROTTLE_KEY, true);
+
+// Module configuration example:
+/*
+import { Module } from "@nestjs/common";
+import { ThrottlerModule } from "@nestjs/throttler";
+import { APP_GUARD } from "@nestjs/core";
+import { CustomThrottlerGuard } from "./guards/throttle.guard";
+
+@Module({
+  imports: [
+    ThrottlerModule.forRoot([{
+      ttl: 60000, // 1 minute
+      limit: 100, // 100 requests
+    }]),
+  ],
+  providers: [
+    {
+      provide: APP_GUARD,
+      useClass: CustomThrottlerGuard,
+    },
+  ],
+})
+export class AppModule {}
+*/

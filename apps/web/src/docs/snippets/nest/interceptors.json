@@ -1,0 +1,106 @@
+{
+  "id": "interceptors",
+  "title": "Interceptors",
+  "description": "Request/response transformation interceptors",
+  "subcategories": [
+    {
+      "id": "transform-interceptors",
+      "title": "Transformation",
+      "description": "Interceptors for modifying responses",
+      "snippets": [
+        {
+          "id": "transform-interceptor",
+          "name": "transform-interceptor",
+          "displayName": "Transform Interceptor",
+          "description": "Wrap responses in consistent format",
+          "purpose": "Automatically wrap all responses in a standard API response format with success flag and metadata.",
+          "features": [
+            "Consistent response format",
+            "Timestamp and path included",
+            "@SkipTransform decorator",
+            "Paginated variant included"
+          ],
+          "usage": "// Global usage\napp.useGlobalInterceptors(new TransformInterceptor());",
+          "output": "src/interceptors/transform.interceptor.ts",
+          "dependencies": [],
+          "command": "npx hanma add transform-interceptor --framework nest"
+        },
+        {
+          "id": "serialize-interceptor",
+          "name": "serialize-interceptor",
+          "displayName": "Serialize Interceptor",
+          "description": "Response serialization with DTOs",
+          "purpose": "Use class-transformer to serialize responses to specific DTOs, hiding sensitive fields.",
+          "features": [
+            "@Serialize decorator",
+            "DTO-based serialization",
+            "Excludes sensitive fields",
+            "Array support"
+          ],
+          "usage": "@Serialize(UserResponseDto)\n@Get(':id')\nfindOne() {}",
+          "output": "src/interceptors/serialize.interceptor.ts",
+          "dependencies": ["class-transformer"],
+          "command": "npx hanma add serialize-interceptor --framework nest"
+        }
+      ]
+    },
+    {
+      "id": "utility-interceptors",
+      "title": "Utilities",
+      "description": "Utility interceptors for logging and caching",
+      "snippets": [
+        {
+          "id": "logging-interceptor",
+          "name": "logging-interceptor",
+          "displayName": "Logging Interceptor",
+          "description": "Request/response logging",
+          "purpose": "Log all requests and responses with timing, status codes, and sensitive data masking.",
+          "features": [
+            "Duration tracking",
+            "Sensitive data masking",
+            "Status-based log levels",
+            "User context included"
+          ],
+          "usage": "// Global usage\napp.useGlobalInterceptors(new LoggingInterceptor());",
+          "output": "src/interceptors/logging.interceptor.ts",
+          "dependencies": [],
+          "command": "npx hanma add logging-interceptor --framework nest"
+        },
+        {
+          "id": "timeout-interceptor",
+          "name": "timeout-interceptor",
+          "displayName": "Timeout Interceptor",
+          "description": "Request timeout handling",
+          "purpose": "Cancel long-running requests. Supports per-route configuration via @Timeout decorator.",
+          "features": [
+            "Configurable timeout",
+            "@Timeout decorator",
+            "Custom error message",
+            "Environment-based default"
+          ],
+          "usage": "@Timeout(60000)\n@Post('upload')\nupload() {}",
+          "output": "src/interceptors/timeout.interceptor.ts",
+          "dependencies": [],
+          "command": "npx hanma add timeout-interceptor --framework nest"
+        },
+        {
+          "id": "cache-interceptor",
+          "name": "cache-interceptor",
+          "displayName": "Cache Interceptor",
+          "description": "Response caching with TTL",
+          "purpose": "Cache GET responses with configurable TTL. Includes cache invalidation service.",
+          "features": [
+            "@CacheTTL decorator",
+            "@NoCache decorator",
+            "Key generation",
+            "Invalidation service"
+          ],
+          "usage": "@CacheTTL(300)\n@Get('popular')\ngetPopular() {}",
+          "output": "src/interceptors/cache.interceptor.ts",
+          "dependencies": ["@nestjs/cache-manager", "cache-manager"],
+          "command": "npx hanma add cache-interceptor --framework nest"
+        }
+      ]
+    }
+  ]
+}

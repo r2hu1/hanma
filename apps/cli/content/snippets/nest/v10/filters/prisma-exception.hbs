@@ -1,0 +1,194 @@
+---
+name: prisma-exception-filter
+description: Exception filter for Prisma ORM errors with user-friendly messages
+dependencies:
+  - "@prisma/client"
+devDependencies: []
+files:
+  - name: filters/prisma-exception.filter.ts
+---
+import {
+  ExceptionFilter,
+  Catch,
+  ArgumentsHost,
+  HttpStatus,
+  Logger,
+  ConflictException,
+  NotFoundException,
+  BadRequestException,
+  InternalServerErrorException,
+} from "@nestjs/common";
+import { Prisma } from "@prisma/client";
+import { Request, Response } from "express";
+
+export interface PrismaErrorResponse {
+  statusCode: number;
+  error: string;
+  message: string;
+  code?: string;
+  meta?: Record<string, any>;
+  path: string;
+  timestamp: string;
+}
+
+@Catch(Prisma.PrismaClientKnownRequestError)
+export class PrismaExceptionFilter implements ExceptionFilter {
+  private readonly logger = new Logger(PrismaExceptionFilter.name);
+
+  catch(exception: Prisma.PrismaClientKnownRequestError, host: ArgumentsHost) {
+    const ctx = host.switchToHttp();
+    const response = ctx.getResponse<Response>();
+    const request = ctx.getRequest<Request>();
+
+    const { status, error, message } = this.mapPrismaError(exception);
+
+    this.logger.warn(
+      `Prisma error ${exception.code}: ${exception.message}`,
+      {
+        code: exception.code,
+        meta: exception.meta,
+        path: request.url,
+      }
+    );
+
+    const errorResponse: PrismaErrorResponse = {
+      statusCode: status,
+      error,
+      message,
+      code: exception.code,
+      meta: process.env.NODE_ENV === "development" ? exception.meta : undefined,
+      path: request.url,
+      timestamp: new Date().toISOString(),
+    };
+
+    response.status(status).json(errorResponse);
+  }
+
+  private mapPrismaError(exception: Prisma.PrismaClientKnownRequestError): {
+    status: number;
+    error: string;
+    message: string;
+  } {
+    switch (exception.code) {
+      // Unique constraint violation
+      case "P2002": {
+        const fields = (exception.meta?.target as string[]) || ["field"];
+        return {
+          status: HttpStatus.CONFLICT,
+          error: "Conflict",
+          message: `A record with this ${fields.join(", ")} already exists`,
+        };
+      }
+
+      // Foreign key constraint violation
+      case "P2003": {
+        const field = exception.meta?.field_name as string;
+        return {
+          status: HttpStatus.BAD_REQUEST,
+          error: "Bad Request",
+          message: `Invalid reference: ${field || "related record"} does not exist`,
+        };
+      }
+
+      // Record not found
+      case "P2001":
+      case "P2018":
+      case "P2025": {
+        return {
+          status: HttpStatus.NOT_FOUND,
+          error: "Not Found",
+          message: "The requested record was not found",
+        };
+      }
+
+      // Value too long for column
+      case "P2000": {
+        const column = exception.meta?.column_name as string;
+        return {
+          status: HttpStatus.BAD_REQUEST,
+          error: "Bad Request",
+          message: `Value too long for ${column || "field"}`,
+        };
+      }
+
+      // Required field missing
+      case "P2011":
+      case "P2012": {
+        return {
+          status: HttpStatus.BAD_REQUEST,
+          error: "Bad Request",
+          message: "A required field is missing",
+        };
+      }
+
+      // Invalid ID
+      case "P2023": {
+        return {
+          status: HttpStatus.BAD_REQUEST,
+          error: "Bad Request",
+          message: "Invalid ID format",
+        };
+      }
+
+      // Query interpretation error
+      case "P2016":
+      case "P2017": {
+        return {
+          status: HttpStatus.BAD_REQUEST,
+          error: "Bad Request",
+          message: "Invalid query parameters",
+        };
+      }
+
+      // Default
+      default:
+        return {
+          status: HttpStatus.INTERNAL_SERVER_ERROR,
+          error: "Internal Server Error",
+          message: "A database error occurred",
+        };
+    }
+  }
+}
+
+// Catch Prisma validation errors
+@Catch(Prisma.PrismaClientValidationError)
+export class PrismaValidationFilter implements ExceptionFilter {
+  private readonly logger = new Logger(PrismaValidationFilter.name);
+
+  catch(exception: Prisma.PrismaClientValidationError, host: ArgumentsHost) {
+    const ctx = host.switchToHttp();
+    const response = ctx.getResponse<Response>();
+    const request = ctx.getRequest<Request>();
+
+    this.logger.error("Prisma validation error", exception.message);
+
+    response.status(HttpStatus.BAD_REQUEST).json({
+      statusCode: HttpStatus.BAD_REQUEST,
+      error: "Bad Request",
+      message: "Invalid data provided",
+      path: request.url,
+      timestamp: new Date().toISOString(),
+    });
+  }
+}
+
+// Usage in AppModule:
+/*
+import { APP_FILTER } from "@nestjs/core";
+import { PrismaExceptionFilter, PrismaValidationFilter } from "./filters/prisma-exception.filter";
+
+@Module({
+  providers: [
+    {
+      provide: APP_FILTER,
+      useClass: PrismaExceptionFilter,
+    },
+    {
+      provide: APP_FILTER,
+      useClass: PrismaValidationFilter,
+    },
+  ],
+})
+export class AppModule {}
+*/

@@ -1,0 +1,65 @@
+{
+  "id": "providers",
+  "title": "Providers",
+  "description": "Injectable services and utilities",
+  "subcategories": [
+    {
+      "id": "core-providers",
+      "title": "Core Services",
+      "description": "Essential infrastructure services",
+      "snippets": [
+        {
+          "id": "config-provider",
+          "name": "config-provider",
+          "displayName": "Config Service",
+          "description": "Type-safe configuration with validation",
+          "purpose": "Validate environment variables at startup with Zod. Provides typed access to configuration.",
+          "features": [
+            "Zod schema validation",
+            "Startup validation",
+            "Type-safe getters",
+            "Environment helpers"
+          ],
+          "usage": "const port = this.config.get('PORT');\nconst jwt = this.config.jwtConfig;",
+          "output": "src/providers/config.service.ts",
+          "dependencies": ["zod"],
+          "command": "npx hanma add config-provider --framework nest"
+        },
+        {
+          "id": "logger-provider",
+          "name": "logger-provider",
+          "displayName": "Logger Service",
+          "description": "Custom Winston-based logger",
+          "purpose": "Structured logging with Winston. Supports context, request correlation, and execution timing.",
+          "features": [
+            "Winston integration",
+            "Context support",
+            "Execution timing",
+            "File transport"
+          ],
+          "usage": "this.logger.setContext('UserService');\nthis.logger.log('User created');",
+          "output": "src/providers/logger.service.ts",
+          "dependencies": ["winston"],
+          "command": "npx hanma add logger-provider --framework nest"
+        },
+        {
+          "id": "health-provider",
+          "name": "health-provider",
+          "displayName": "Health Indicators",
+          "description": "Health check services",
+          "purpose": "Health indicators for databases, Redis, memory, and external APIs. Compatible with @nestjs/terminus.",
+          "features": [
+            "Database health",
+            "Redis health",
+            "Memory usage",
+            "External API health"
+          ],
+          "usage": "@HealthCheck()\ncheck() {\n  return this.health.check([\n    () => this.db.isHealthy(),\n  ]);\n}",
+          "output": "src/providers/health.service.ts",
+          "dependencies": ["@nestjs/terminus"],
+          "command": "npx hanma add health-provider --framework nest"
+        }
+      ]
+    }
+  ]
+}

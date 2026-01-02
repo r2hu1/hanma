@@ -1,0 +1,14 @@
+
+---
+name: tsconfig-nestjs-build
+description: TypeScript configuration for Node.js NestJS projects
+devDependencies:
+  - typescript
+files:
+  - name: tsconfig.build.json
+---
+
+{
+  "extends": "./tsconfig.json",
+  "exclude": ["node_modules", "test", "dist", "**/*spec.ts"]
+}

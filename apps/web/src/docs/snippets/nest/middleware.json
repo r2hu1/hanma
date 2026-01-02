@@ -1,0 +1,48 @@
+{
+  "id": "middleware",
+  "title": "Middleware",
+  "description": "Express-compatible middleware",
+  "subcategories": [
+    {
+      "id": "request-middleware",
+      "title": "Request Processing",
+      "description": "Middleware for request handling",
+      "snippets": [
+        {
+          "id": "request-id-middleware",
+          "name": "request-id-middleware",
+          "displayName": "Request ID Middleware",
+          "description": "Request ID generation for tracing",
+          "purpose": "Generate unique request IDs for distributed tracing and logging correlation.",
+          "features": [
+            "UUID generation",
+            "Correlation ID support",
+            "Response headers",
+            "AWS ALB support"
+          ],
+          "usage": "// In AppModule\nconfigure(consumer: MiddlewareConsumer) {\n  consumer.apply(RequestIdMiddleware).forRoutes('*');\n}",
+          "output": "src/middleware/request-id.middleware.ts",
+          "dependencies": ["uuid"],
+          "command": "npx hanma add request-id-middleware --framework nest"
+        },
+        {
+          "id": "logger-middleware",
+          "name": "logger-middleware",
+          "displayName": "Logger Middleware",
+          "description": "HTTP request logging",
+          "purpose": "Log all HTTP requests with configurable body/header logging and sensitive data masking.",
+          "features": [
+            "Request/response logging",
+            "Sensitive data masking",
+            "Configurable options",
+            "Path exclusions"
+          ],
+          "usage": "// In AppModule\nconfigure(consumer: MiddlewareConsumer) {\n  consumer.apply(LoggerMiddleware).forRoutes('*');\n}",
+          "output": "src/middleware/logger.middleware.ts",
+          "dependencies": [],
+          "command": "npx hanma add logger-middleware --framework nest"
+        }
+      ]
+    }
+  ]
+}

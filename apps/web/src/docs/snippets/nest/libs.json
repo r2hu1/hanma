@@ -1,0 +1,194 @@
+{
+  "id": "libs",
+  "title": "Libraries",
+  "description": "Server implementations and database services for NestJS applications",
+  "subcategories": [
+    {
+      "id": "servers",
+      "title": "Servers",
+      "description": "Production-ready server implementations",
+      "snippets": [
+        {
+          "id": "nest-express-server",
+          "name": "nest-express-server",
+          "displayName": "NestJS Express Server",
+          "description": "Production-ready NestJS HTTP server with Express adapter",
+          "purpose": "Start a NestJS application with Express adapter. Includes Swagger, versioning, CORS, Helmet, and request logging.",
+          "features": [
+            "Express adapter (familiar ecosystem)",
+            "Swagger API documentation",
+            "API versioning support",
+            "Class-based modular setup",
+            "Request/response logging"
+          ],
+          "usage": "HttpServer.create(AppModule, {\\n  enableVersioning: true,\\n  enableApiDocumentation: true,\\n});",
+          "output": "src/main.ts",
+          "dependencies": ["@nestjs/core", "@nestjs/common", "@nestjs/platform-express", "@nestjs/swagger", "helmet"],
+          "command": "npx hanma add nest-express-server --framework nest"
+        },
+        {
+          "id": "nest-fastify-server",
+          "name": "nest-fastify-server",
+          "displayName": "NestJS Fastify Server",
+          "description": "Production-ready NestJS HTTP server with Fastify adapter",
+          "purpose": "Start a NestJS application with Fastify adapter for higher performance. Includes Swagger, versioning, CORS, Helmet, and request logging.",
+          "features": [
+            "Fastify adapter (higher performance)",
+            "Swagger API documentation",
+            "API versioning support",
+            "Class-based modular setup",
+            "Request/response logging"
+          ],
+          "usage": "HttpServer.create(AppModule, {\\n  enableVersioning: true,\\n  enableApiDocumentation: true,\\n});",
+          "output": "src/main.ts",
+          "dependencies": ["@nestjs/core", "@nestjs/common", "@nestjs/platform-fastify", "@nestjs/swagger", "@fastify/helmet"],
+          "command": "npx hanma add nest-fastify-server --framework nest"
+        },
+        {
+          "id": "nest-websocket",
+          "name": "nest-websocket",
+          "displayName": "WebSocket Gateway",
+          "description": "Real-time WebSocket gateway with Socket.io",
+          "purpose": "Add real-time capabilities using WebSocket gateways. Perfect for chat, live updates, and collaborative features.",
+          "features": [
+            "Socket.io integration",
+            "Room management",
+            "Broadcast functionality",
+            "Connection lifecycle hooks"
+          ],
+          "usage": "// Add to module providers\n@Module({\n  providers: [WebsocketGateway],\n})",
+          "output": "src/gateways/websocket.gateway.ts",
+          "dependencies": ["@nestjs/websockets", "@nestjs/platform-socket.io", "socket.io"],
+          "command": "npx hanma add nest-websocket --framework nest"
+        },
+        {
+          "id": "nest-graphql",
+          "name": "nest-graphql",
+          "displayName": "GraphQL Module",
+          "description": "Apollo GraphQL server with code-first approach",
+          "purpose": "Build a GraphQL API with Apollo. Supports code-first schema generation and subscriptions.",
+          "features": [
+            "Apollo Server integration",
+            "Code-first schema generation",
+            "Custom error formatting",
+            "GraphQL subscriptions"
+          ],
+          "usage": "// Import in AppModule\n@Module({\n  imports: [GraphqlConfigModule],\n})",
+          "output": "src/graphql/graphql.module.ts",
+          "dependencies": ["@nestjs/graphql", "@nestjs/apollo", "@apollo/server", "graphql"],
+          "command": "npx hanma add nest-graphql --framework nest"
+        },
+        {
+          "id": "nest-microservice",
+          "name": "nest-microservice",
+          "displayName": "Microservice Bootstrap",
+          "description": "Configurable microservice with multiple transports",
+          "purpose": "Create a hybrid application running HTTP and microservice transports. Fully configurable with type-safe options for TCP, Redis, RabbitMQ, and NATS.",
+          "features": [
+            "Type-safe transport configuration",
+            "TCP/Redis/RabbitMQ/NATS support",
+            "Class-based MicroserviceServer setup",
+            "Hybrid or standalone modes",
+            "Graceful shutdown handling"
+          ],
+          "usage": "MicroserviceServer.create(AppModule, {\\n  transports: [{ type: 'tcp' }, { type: 'redis' }],\\n  enableHttp: true,\\n});",
+          "output": "src/microservice/microservice.setup.ts",
+          "dependencies": ["@nestjs/microservices", "@nestjs/config"],
+          "command": "npx hanma add nest-microservice --framework nest"
+        },
+        {
+          "id": "nest-grpc",
+          "name": "nest-grpc",
+          "displayName": "gRPC Server",
+          "description": "gRPC server configuration with proto loading",
+          "purpose": "Build high-performance gRPC services with proto file support and example controller implementation.",
+          "features": [
+            "Proto file loading",
+            "gRPC service options",
+            "Example controller patterns",
+            "Streaming support"
+          ],
+          "usage": "// Add to microservice options\napp.connectMicroservice(grpcClientOptions);",
+          "output": "src/grpc/grpc.options.ts",
+          "dependencies": ["@nestjs/microservices", "@grpc/grpc-js", "@grpc/proto-loader"],
+          "command": "npx hanma add nest-grpc --framework nest"
+        }
+      ]
+    },
+    {
+      "id": "database",
+      "title": "Database",
+      "description": "Database clients and ORM integrations",
+      "snippets": [
+        {
+          "id": "prisma-service",
+          "name": "prisma-service",
+          "displayName": "Prisma Service",
+          "description": "Prisma client as injectable NestJS service",
+          "purpose": "Use Prisma ORM with NestJS lifecycle hooks. Includes health check and transaction helpers.",
+          "features": [
+            "Module lifecycle integration",
+            "Health check method",
+            "Transaction helper with retry",
+            "Connection management"
+          ],
+          "usage": "constructor(private prisma: PrismaService) {}\n\nconst users = await this.prisma.user.findMany();",
+          "output": "src/providers/prisma.service.ts",
+          "dependencies": ["@prisma/client"],
+          "command": "npx hanma add prisma-service --framework nest"
+        },
+        {
+          "id": "drizzle-service",
+          "name": "drizzle-service",
+          "displayName": "Drizzle Service",
+          "description": "Drizzle ORM service with PostgreSQL",
+          "purpose": "Use Drizzle ORM with NestJS. Includes connection pool and transaction support.",
+          "features": [
+            "PostgreSQL connection pool",
+            "Transaction helper",
+            "Raw SQL execution",
+            "Health check"
+          ],
+          "usage": "constructor(private drizzle: DrizzleService) {}\n\nconst users = await this.drizzle.db.select().from(users);",
+          "output": "src/providers/drizzle.service.ts",
+          "dependencies": ["drizzle-orm", "pg"],
+          "command": "npx hanma add drizzle-service --framework nest"
+        },
+        {
+          "id": "redis-service",
+          "name": "redis-service",
+          "displayName": "Redis Service",
+          "description": "Redis client with caching and pub/sub",
+          "purpose": "Full-featured Redis client with caching, pub/sub, and hash operations.",
+          "features": [
+            "Cache-aside pattern",
+            "Pub/Sub support",
+            "Hash and list operations",
+            "Connection management"
+          ],
+          "usage": "const value = await this.redis.get('key');\nawait this.redis.set('key', value, 3600);",
+          "output": "src/providers/redis.service.ts",
+          "dependencies": ["ioredis"],
+          "command": "npx hanma add redis-service --framework nest"
+        },
+        {
+          "id": "kafka-service",
+          "name": "kafka-service",
+          "displayName": "Kafka Service",
+          "description": "Apache Kafka client for event-driven architecture",
+          "purpose": "Build event-driven systems with Kafka. Supports producers, consumers, and admin operations.",
+          "features": [
+            "Producer with compression",
+            "Consumer subscriptions",
+            "Topic management",
+            "Batch publishing"
+          ],
+          "usage": "await this.kafka.publish('topic', { key: 'id', value: data });",
+          "output": "src/providers/kafka.service.ts",
+          "dependencies": ["kafkajs"],
+          "command": "npx hanma add kafka-service --framework nest"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,155 @@
+---
+name: validation-filter
+description: Exception filter specifically for validation errors with field-level details
+dependencies: []
+devDependencies: []
+files:
+  - name: filters/validation.filter.ts
+---
+import {
+  ExceptionFilter,
+  Catch,
+  ArgumentsHost,
+  BadRequestException,
+} from "@nestjs/common";
+import { Request, Response } from "express";
+
+export interface ValidationErrorItem {
+  field: string;
+  message: string;
+  value?: any;
+}
+
+export interface ValidationErrorResponse {
+  statusCode: 400;
+  error: "Validation Error";
+  message: string;
+  errors: ValidationErrorItem[];
+  path: string;
+  timestamp: string;
+}
+
+/**
+ * Custom exception for validation errors with structured field errors.
+ */
+export class ValidationException extends BadRequestException {
+  constructor(public readonly errors: ValidationErrorItem[]) {
+    super({
+      statusCode: 400,
+      message: "Validation failed",
+      errors,
+    });
+  }
+}
+
+@Catch(BadRequestException)
+export class ValidationExceptionFilter implements ExceptionFilter {
+  catch(exception: BadRequestException, host: ArgumentsHost) {
+    const ctx = host.switchToHttp();
+    const response = ctx.getResponse<Response>();
+    const request = ctx.getRequest<Request>();
+
+    const exceptionResponse = exception.getResponse() as any;
+
+    // Check if this is a validation error
+    const isValidationError =
+      exceptionResponse?.errors ||
+      (Array.isArray(exceptionResponse?.message) &&
+        exceptionResponse.message.length > 0);
+
+    if (!isValidationError) {
+      // Not a validation error, let it pass through
+      response.status(400).json({
+        statusCode: 400,
+        error: "Bad Request",
+        message: exceptionResponse?.message || exception.message,
+        path: request.url,
+        timestamp: new Date().toISOString(),
+      });
+      return;
+    }
+
+    const errors = this.extractErrors(exceptionResponse);
+
+    const errorResponse: ValidationErrorResponse = {
+      statusCode: 400,
+      error: "Validation Error",
+      message: `Validation failed: ${errors.length} error(s)`,
+      errors,
+      path: request.url,
+      timestamp: new Date().toISOString(),
+    };
+
+    response.status(400).json(errorResponse);
+  }
+
+  private extractErrors(response: any): ValidationErrorItem[] {
+    // Handle custom ValidationException
+    if (response.errors && Array.isArray(response.errors)) {
+      return response.errors;
+    }
+
+    // Handle class-validator errors (string array)
+    if (Array.isArray(response.message)) {
+      return response.message.map((msg: string) => {
+        const match = msg.match(/^(\w+)\s+(.+)$/);
+        if (match) {
+          return {
+            field: match[1],
+            message: match[2],
+          };
+        }
+        return {
+          field: "unknown",
+          message: msg,
+        };
+      });
+    }
+
+    // Fallback
+    return [
+      {
+        field: "unknown",
+        message: response.message || "Validation failed",
+      },
+    ];
+  }
+}
+
+// Helper function to throw validation errors
+export function throwValidationError(
+  field: string,
+  message: string,
+  value?: any
+): never {
+  throw new ValidationException([{ field, message, value }]);
+}
+
+export function throwValidationErrors(errors: ValidationErrorItem[]): never {
+  throw new ValidationException(errors);
+}
+
+// Usage:
+/*
+import { ValidationException, throwValidationError } from "./filters/validation.filter";
+
+@Injectable()
+export class UserService {
+  async create(dto: CreateUserDto) {
+    // Custom validation
+    const existingUser = await this.findByEmail(dto.email);
+    if (existingUser) {
+      throwValidationError("email", "Email already exists", dto.email);
+    }
+
+    // Multiple errors
+    const errors: ValidationErrorItem[] = [];
+    if (dto.password === dto.email) {
+      errors.push({ field: "password", message: "Password cannot be same as email" });
+    }
+    if (errors.length > 0) {
+      throw new ValidationException(errors);
+    }
+  }
+}
+*/

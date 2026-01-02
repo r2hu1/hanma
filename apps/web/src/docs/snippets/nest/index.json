@@ -1,0 +1,53 @@
+{
+  "framework": "nest",
+  "version": "v10",
+  "title": "NestJS v10 Snippets",
+  "description": "Production-ready code snippets for NestJS v10 applications. A progressive Node.js framework with TypeScript support, decorators, and dependency injection.",
+  "installNote": "Install snippets with: npx hanma add <snippet-name> --framework nest",
+  "concept": {
+    "whatIsASnippet": "A snippet is a single, self-contained code file that provides a specific utility, decorator, guard, interceptor, or integration. Snippets are designed to be dropped into your project and customized as needed.",
+    "whenToUseSnippets": [
+      "When you need a specific decorator, guard, or interceptor",
+      "When you want copy-paste code you own and can modify",
+      "When you prefer composition over packages"
+    ],
+    "snippetsVsPackages": {
+      "snippets": "Code you own - copy, paste, modify freely",
+      "packages": "External dependencies - updates managed by maintainers",
+      "benefit": "Snippets give you full control and no dependency bloat"
+    }
+  },
+  "examples": [
+    {
+      "title": "Add a single snippet",
+      "description": "Add the NestJS server bootstrap to your project",
+      "command": "npx hanma add nest-server --framework nest"
+    },
+    {
+      "title": "Add multiple snippets",
+      "description": "Add several related snippets at once",
+      "command": "npx hanma add jwt-auth-guard roles-guard current-user --framework nest"
+    },
+    {
+      "title": "Add all guards",
+      "description": "Add all snippets in a category",
+      "command": "npx hanma add --all --category guards --framework nest"
+    },
+    {
+      "title": "Interactive selection",
+      "description": "Use multi-select to choose snippets",
+      "command": "npx hanma add --framework nest"
+    }
+  ],
+  "categoryFiles": [
+    { "id": "libs", "file": "libs.json", "title": "Libraries", "description": "Server implementations and database services" },
+    { "id": "decorators", "file": "decorators.json", "title": "Decorators", "description": "Custom decorators for controllers and methods" },
+    { "id": "guards", "file": "guards.json", "title": "Guards", "description": "Authentication and authorization guards" },
+    { "id": "interceptors", "file": "interceptors.json", "title": "Interceptors", "description": "Request/response transformation interceptors" },
+    { "id": "pipes", "file": "pipes.json", "title": "Pipes", "description": "Validation and transformation pipes" },
+    { "id": "filters", "file": "filters.json", "title": "Filters", "description": "Exception filters for error handling" },
+    { "id": "middleware", "file": "middleware.json", "title": "Middleware", "description": "Express-compatible middleware" },
+    { "id": "providers", "file": "providers.json", "title": "Providers", "description": "Injectable services and utilities" },
+    { "id": "utils", "file": "utils.json", "title": "Utilities", "description": "Standalone utility functions" }
+  ]
+}

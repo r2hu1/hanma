@@ -1,0 +1,126 @@
+---
+name: trim-strings-pipe
+description: Pipe to trim whitespace from string fields in request body
+dependencies: []
+devDependencies: []
+files:
+  - name: pipes/trim-strings.pipe.ts
+---
+import { PipeTransform, Injectable, ArgumentMetadata } from "@nestjs/common";
+
+export interface TrimOptions {
+  /**
+   * If true, converts empty strings to null.
+   */
+  emptyToNull?: boolean;
+  
+  /**
+   * Fields to exclude from trimming.
+   */
+  exclude?: string[];
+  
+  /**
+   * If true, only trims specified fields (include takes precedence).
+   */
+  include?: string[];
+  
+  /**
+   * Maximum depth for nested object trimming.
+   */
+  maxDepth?: number;
+}
+
+@Injectable()
+export class TrimStringsPipe implements PipeTransform {
+  private readonly options: Required<TrimOptions>;
+
+  constructor(options: TrimOptions = {}) {
+    this.options = {
+      emptyToNull: options.emptyToNull ?? false,
+      exclude: options.exclude ?? [],
+      include: options.include ?? [],
+      maxDepth: options.maxDepth ?? 10,
+    };
+  }
+
+  transform(value: any, metadata: ArgumentMetadata): any {
+    if (metadata.type !== "body" && metadata.type !== "query") {
+      return value;
+    }
+
+    return this.trimValue(value, 0);
+  }
+
+  private trimValue(value: any, depth: number): any {
+    if (depth > this.options.maxDepth) {
+      return value;
+    }
+
+    if (typeof value === "string") {
+      const trimmed = value.trim();
+      if (this.options.emptyToNull && trimmed === "") {
+        return null;
+      }
+      return trimmed;
+    }
+
+    if (Array.isArray(value)) {
+      return value.map((item) => this.trimValue(item, depth + 1));
+    }
+
+    if (value !== null && typeof value === "object") {
+      const result: Record<string, any> = {};
+
+      for (const key of Object.keys(value)) {
+        if (this.shouldTrim(key)) {
+          result[key] = this.trimValue(value[key], depth + 1);
+        } else {
+          result[key] = value[key];
+        }
+      }
+
+      return result;
+    }
+
+    return value;
+  }
+
+  private shouldTrim(key: string): boolean {
+    // If include list is specified, only trim those fields
+    if (this.options.include.length > 0) {
+      return this.options.include.includes(key);
+    }
+
+    // If exclude list is specified, skip those fields
+    if (this.options.exclude.includes(key)) {
+      return false;
+    }
+
+    return true;
+  }
+}
+
+// Preset instances
+export const TrimPipe = new TrimStringsPipe();
+export const TrimWithNullPipe = new TrimStringsPipe({ emptyToNull: true });
+
+// Usage:
+/*
+import { TrimStringsPipe, TrimPipe } from "./pipes/trim-strings.pipe";
+
+// Global usage in main.ts
+app.useGlobalPipes(new TrimStringsPipe());
+
+// Controller usage
+@Controller("users")
+export class UsersController {
+  @Post()
+  @UsePipes(TrimPipe)
+  create(@Body() dto: CreateUserDto) {}
+
+  // With custom options
+  @Post("with-password")
+  @UsePipes(new TrimStringsPipe({ exclude: ["password"] }))
+  createWithPassword(@Body() dto: CreateUserDto) {}
+}
+*/
