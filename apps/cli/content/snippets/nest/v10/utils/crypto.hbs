@@ -1,0 +1,187 @@
+---
+name: crypto
+description: Encryption utilities using AES-256-GCM with secure key derivation
+dependencies: []
+devDependencies: []
+files:
+  - name: utils/crypto.ts
+---
+import {
+  createCipheriv,
+  createDecipheriv,
+  randomBytes,
+  scryptSync,
+  timingSafeEqual,
+} from "crypto";
+
+const ALGORITHM = "aes-256-gcm";
+const KEY_LENGTH = 32;
+const IV_LENGTH = 16;
+const AUTH_TAG_LENGTH = 16;
+const SALT_LENGTH = 32;
+
+// Derive key from password/secret
+function deriveKey(secret: string, salt: Buffer): Buffer {
+  return scryptSync(secret, salt, KEY_LENGTH);
+}
+
+/**
+ * Encrypt a string using AES-256-GCM.
+ * Returns format: salt:iv:authTag:encryptedData (all hex encoded)
+ */
+export function encrypt(plainText: string, secret?: string): string {
+  const key = secret || process.env.ENCRYPTION_KEY;
+  if (!key) {
+    throw new Error("Encryption key not provided");
+  }
+
+  const salt = randomBytes(SALT_LENGTH);
+  const derivedKey = deriveKey(key, salt);
+  const iv = randomBytes(IV_LENGTH);
+
+  const cipher = createCipheriv(ALGORITHM, derivedKey, iv);
+  let encrypted = cipher.update(plainText, "utf8", "hex");
+  encrypted += cipher.final("hex");
+
+  const authTag = cipher.getAuthTag();
+
+  return [
+    salt.toString("hex"),
+    iv.toString("hex"),
+    authTag.toString("hex"),
+    encrypted,
+  ].join(":");
+}
+
+/**
+ * Decrypt a string encrypted with encrypt().
+ */
+export function decrypt(encryptedText: string, secret?: string): string {
+  const key = secret || process.env.ENCRYPTION_KEY;
+  if (!key) {
+    throw new Error("Encryption key not provided");
+  }
+
+  const [saltHex, ivHex, authTagHex, encrypted] = encryptedText.split(":");
+  
+  if (!saltHex || !ivHex || !authTagHex || !encrypted) {
+    throw new Error("Invalid encrypted format");
+  }
+
+  const salt = Buffer.from(saltHex, "hex");
+  const iv = Buffer.from(ivHex, "hex");
+  const authTag = Buffer.from(authTagHex, "hex");
+  const derivedKey = deriveKey(key, salt);
+
+  const decipher = createDecipheriv(ALGORITHM, derivedKey, iv);
+  decipher.setAuthTag(authTag);
+
+  let decrypted = decipher.update(encrypted, "hex", "utf8");
+  decrypted += decipher.final("utf8");
+
+  return decrypted;
+}
+
+/**
+ * Encrypt an object to JSON.
+ */
+export function encryptObject<T>(obj: T, secret?: string): string {
+  return encrypt(JSON.stringify(obj), secret);
+}
+
+/**
+ * Decrypt to an object.
+ */
+export function decryptObject<T>(encryptedText: string, secret?: string): T {
+  return JSON.parse(decrypt(encryptedText, secret));
+}
+
+/**
+ * Generate a random hex string.
+ */
+export function generateRandomHex(length = 32): string {
+  return randomBytes(length).toString("hex");
+}
+
+/**
+ * Generate a random base64url string.
+ */
+export function generateRandomBase64(length = 32): string {
+  return randomBytes(length).toString("base64url");
+}
+
+/**
+ * Generate a secure token (e.g., for password reset).
+ */
+export function generateToken(length = 48): string {
+  return randomBytes(length).toString("base64url");
+}
+
+/**
+ * Hash a string using SHA-256.
+ */
+export function sha256(input: string): string {
+  const { createHash } = require("crypto");
+  return createHash("sha256").update(input).digest("hex");
+}
+
+/**
+ * Timing-safe string comparison.
+ */
+export function secureCompare(a: string, b: string): boolean {
+  if (typeof a !== "string" || typeof b !== "string") {
+    return false;
+  }
+
+  if (a.length !== b.length) {
+    return false;
+  }
+
+  return timingSafeEqual(Buffer.from(a), Buffer.from(b));
+}
+
+/**
+ * Generate a HMAC signature.
+ */
+export function generateHmac(
+  data: string,
+  secret?: string,
+  algorithm = "sha256"
+): string {
+  const { createHmac } = require("crypto");
+  const key = secret || process.env.HMAC_SECRET;
+  if (!key) {
+    throw new Error("HMAC secret not provided");
+  }
+  return createHmac(algorithm, key).update(data).digest("hex");
+}
+
+/**
+ * Verify a HMAC signature.
+ */
+export function verifyHmac(
+  data: string,
+  signature: string,
+  secret?: string
+): boolean {
+  const expectedSignature = generateHmac(data, secret);
+  return secureCompare(signature, expectedSignature);
+}
+
+// Usage:
+/*
+
+import { encrypt, decrypt, generateToken, sha256 } from "./utils/crypto";
+
+// Encrypt sensitive data
+const encrypted = encrypt("sensitive-data");
+const decrypted = decrypt(encrypted);
+
+// Generate password reset token
+const resetToken = generateToken();
+const hashedToken = sha256(resetToken); // Store hashed version
+
+// Verify webhook signature
+const isValid = verifyHmac(requestBody, signatureHeader);
+
+*/

@@ -1,0 +1,181 @@
+---
+name: pagination
+description: Pagination DTOs and helpers for cursor and offset-based pagination
+dependencies: []
+devDependencies: []
+files:
+  - name: utils/pagination.ts
+---
+import { ApiPropertyOptional, ApiProperty } from "@nestjs/swagger";
+import { IsOptional, IsInt, Min, Max, IsString } from "class-validator";
+import { Type } from "class-transformer";
+
+// Offset-based pagination
+export class PaginationQueryDto {
+  @ApiPropertyOptional({ minimum: 1, default: 1 })
+  @Type(() => Number)
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  page?: number = 1;
+
+  @ApiPropertyOptional({ minimum: 1, maximum: 100, default: 20 })
+  @Type(() => Number)
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  limit?: number = 20;
+}
+
+export class PaginationMeta {
+  @ApiProperty()
+  total: number;
+
+  @ApiProperty()
+  page: number;
+
+  @ApiProperty()
+  limit: number;
+
+  @ApiProperty()
+  totalPages: number;
+
+  @ApiProperty()
+  hasNext: boolean;
+
+  @ApiProperty()
+  hasPrev: boolean;
+}
+
+export class PaginatedResponseDto<T> {
+  data: T[];
+  meta: PaginationMeta;
+
+  constructor(data: T[], total: number, page: number, limit: number) {
+    const totalPages = Math.ceil(total / limit);
+
+    this.data = data;
+    this.meta = {
+      total,
+      page,
+      limit,
+      totalPages,
+      hasNext: page < totalPages,
+      hasPrev: page > 1,
+    };
+  }
+}
+
+// Cursor-based pagination
+export class CursorPaginationQueryDto {
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  cursor?: string;
+
+  @ApiPropertyOptional({ minimum: 1, maximum: 100, default: 20 })
+  @Type(() => Number)
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  limit?: number = 20;
+}
+
+export class CursorPaginationMeta {
+  @ApiProperty()
+  hasMore: boolean;
+
+  @ApiPropertyOptional()
+  nextCursor?: string;
+
+  @ApiPropertyOptional()
+  prevCursor?: string;
+}
+
+export class CursorPaginatedResponseDto<T> {
+  data: T[];
+  meta: CursorPaginationMeta;
+
+  constructor(
+    data: T[],
+    hasMore: boolean,
+    nextCursor?: string,
+    prevCursor?: string
+  ) {
+    this.data = data;
+    this.meta = { hasMore, nextCursor, prevCursor };
+  }
+}
+
+// Utility functions
+export function encodeCursor(id: string | number, createdAt?: Date): string {
+  const payload = { id, createdAt: createdAt?.toISOString() };
+  return Buffer.from(JSON.stringify(payload)).toString("base64url");
+}
+
+export function decodeCursor(cursor: string): { id: string; createdAt?: Date } {
+  try {
+    const payload = JSON.parse(Buffer.from(cursor, "base64url").toString());
+    return {
+      id: payload.id,
+      createdAt: payload.createdAt ? new Date(payload.createdAt) : undefined,
+    };
+  } catch {
+    throw new Error("Invalid cursor");
+  }
+}
+
+// Calculate skip for Prisma/TypeORM
+export function getSkip(page: number, limit: number): number {
+  return (page - 1) * limit;
+}
+
+// Prisma pagination helper
+export function prismaOffsetPagination(query: PaginationQueryDto) {
+  const page = query.page || 1;
+  const limit = query.limit || 20;
+
+  return {
+    skip: getSkip(page, limit),
+    take: limit,
+  };
+}
+
+// Prisma cursor pagination helper
+export function prismaCursorPagination(query: CursorPaginationQueryDto) {
+  const limit = query.limit || 20;
+
+  if (!query.cursor) {
+    return { take: limit + 1 }; // Take extra to check hasMore
+  }
+
+  const { id } = decodeCursor(query.cursor);
+
+  return {
+    take: limit + 1,
+    skip: 1, // Skip the cursor itself
+    cursor: { id },
+  };
+}
+
+// Usage:
+/*
+@Controller("users")
+export class UsersController {
+  constructor(private readonly usersService: UsersService) {}
+
+  @Get()
+  async findAll(@Query() query: PaginationQueryDto) {
+    const { data, total } = await this.usersService.findAll(query);
+    return new PaginatedResponseDto(data, total, query.page, query.limit);
+  }
+
+  @Get("cursor")
+  async findAllCursor(@Query() query: CursorPaginationQueryDto) {
+    const { data, hasMore, nextCursor } = await this.usersService.findAllCursor(query);
+    return new CursorPaginatedResponseDto(data, hasMore, nextCursor);
+  }
+}
+*/
