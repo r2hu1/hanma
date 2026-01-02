@@ -1,54 +1,393 @@
 ---
 name: nest-microservice
-description: NestJS microservice setup with TCP and Redis transports for distributed systems
+description: Configurable NestJS microservice bootstrap with TCP/Redis/RabbitMQ transports, logging, and graceful shutdown
 dependencies:
   - "@nestjs/microservices"
+  - "@nestjs/config"
 devDependencies:
   - "@types/node"
 files:
-  - name: main.ts
+  - name: microservice/microservice.interface.ts
+  - name: microservice/microservice.setup.ts
 ---
-import { NestFactory } from "@nestjs/core";
-import { MicroserviceOptions, Transport } from "@nestjs/microservices";
-import { Logger } from "@nestjs/common";
-import { AppModule } from "./app.module";
+// ============================================================================
+// microservice/microservice.interface.ts - Configuration interfaces
+// ============================================================================
 
-async function bootstrap() {
-  const logger = new Logger("Microservice");
+import { Transport } from "@nestjs/microservices";
 
-  // Create hybrid application (HTTP + Microservice)
-  const app = await NestFactory.create(AppModule);
-
-  // TCP Transport
-  app.connectMicroservice<MicroserviceOptions>({
-    transport: Transport.TCP,
-    options: {
-      host: process.env.TCP_HOST || "0.0.0.0",
-      port: parseInt(process.env.TCP_PORT || "3001", 10),
-    },
-  });
-
-  // Redis Transport (optional - uncomment if using Redis)
-  // app.connectMicroservice<MicroserviceOptions>({
-  //   transport: Transport.REDIS,
-  //   options: {
-  //     host: process.env.REDIS_HOST || "localhost",
-  //     port: parseInt(process.env.REDIS_PORT || "6379", 10),
-  //     password: process.env.REDIS_PASSWORD,
-  //   },
-  // });
-
-  // Start all microservices
-  await app.startAllMicroservices();
-  logger.log("Microservices are listening");
-
-  // Start HTTP server
-  const port = process.env.PORT || 3000;
-  await app.listen(port);
-  logger.log(`HTTP server listening on port ${port}`);
+export interface TcpTransportConfig {
+  type: "tcp";
+  host?: string;
+  port?: number;
+  retryAttempts?: number;
+  retryDelay?: number;
 }
 
-bootstrap().catch((err) => {
-  console.error("Failed to start microservice:", err);
-  process.exit(1);
+export interface RedisTransportConfig {
+  type: "redis";
+  host?: string;
+  port?: number;
+  password?: string;
+  retryAttempts?: number;
+  retryDelay?: number;
+}
+
+export interface RabbitMqTransportConfig {
+  type: "rmq";
+  urls?: string[];
+  queue?: string;
+  queueOptions?: {
+    durable?: boolean;
+  };
+  prefetchCount?: number;
+}
+
+export interface NatsTransportConfig {
+  type: "nats";
+  servers?: string[];
+}
+
+export type TransportConfig =
+  | TcpTransportConfig
+  | RedisTransportConfig
+  | RabbitMqTransportConfig
+  | NatsTransportConfig;
+
+export interface MicroserviceOptions {
+  /** Transports to enable (default: [{ type: "tcp" }]) */
+  transports?: TransportConfig[];
+  /** Enable HTTP server alongside microservices (default: true) */
+  enableHttp?: boolean;
+  /** HTTP port (default: from config or 3000) */
+  httpPort?: number;
+  /** Global API prefix for HTTP (default: "api") */
+  globalPrefix?: string;
+  /** Enable request logging (default: true) */
+  enableLogs?: boolean;
+  /** Enable validation pipe (default: true) */
+  enableValidation?: boolean;
+}
+
+// ============================================================================
+// microservice/microservice.setup.ts - Microservice bootstrap class
+// ============================================================================
+
+import { NestFactory } from "@nestjs/core";
+import {
+  MicroserviceOptions as NestMicroserviceOptions,
+  Transport,
+} from "@nestjs/microservices";
+import {
+  Logger,
+  ValidationPipe,
+  DynamicModule,
+  ForwardReference,
+  Type,
+} from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import type {
+  MicroserviceOptions,
+  TransportConfig,
+  TcpTransportConfig,
+  RedisTransportConfig,
+  RabbitMqTransportConfig,
+  NatsTransportConfig,
+} from "./microservice.interface";
+
+type ModuleType = Type<any> | DynamicModule | ForwardReference;
+
+export class MicroserviceServer {
+  private static logger = new Logger("Microservice");
+  private static app: any;
+
+  /**
+   * Bootstrap hybrid application (HTTP + Microservices)
+   */
+  static async create(module: ModuleType, options: MicroserviceOptions = {}) {
+    const {
+      transports = [{ type: "tcp" }],
+      enableHttp = true,
+      httpPort,
+      globalPrefix = "api",
+      enableLogs = true,
+      enableValidation = true,
+    } = options;
+
+    // Create main application
+    const app = await NestFactory.create(module, {
+      logger: enableLogs
+        ? ["log", "error", "warn", "debug", "verbose"]
+        : ["error", "warn"],
+    });
+
+    this.app = app;
+    const config = app.get(ConfigService);
+
+    // Setup global prefix for HTTP
+    if (enableHttp) {
+      app.setGlobalPrefix(globalPrefix);
+    }
+
+    // Setup validation
+    if (enableValidation) {
+      app.useGlobalPipes(
+        new ValidationPipe({
+          whitelist: true,
+          forbidNonWhitelisted: true,
+          transform: true,
+          transformOptions: {
+            enableImplicitConversion: true,
+          },
+        })
+      );
+    }
+
+    // Connect transports
+    for (const transport of transports) {
+      const transportOptions = this.buildTransportOptions(transport, config);
+      app.connectMicroservice<NestMicroserviceOptions>(transportOptions);
+      this.logger.log(`${transport.type.toUpperCase()} transport configured`);
+    }
+
+    // Setup request logging for microservices
+    if (enableLogs) {
+      this.setupLogging();
+    }
+
+    // Graceful shutdown
+    this.setupGracefulShutdown();
+
+    // Start all microservices
+    await app.startAllMicroservices();
+    this.logger.log("All microservices are listening");
+
+    // Start HTTP server if enabled
+    if (enableHttp) {
+      const port = httpPort ?? config.get<number>("PORT", 3000);
+      await app.listen(port);
+      this.logger.log(`HTTP server listening on http://localhost:${port}/${globalPrefix}`);
+    }
+
+    return app;
+  }
+
+  /**
+   * Create standalone microservice (no HTTP)
+   */
+  static async createStandalone(
+    module: ModuleType,
+    transport: TransportConfig = { type: "tcp" }
+  ) {
+    const app = await NestFactory.create(module, { logger: false });
+    const config = app.get(ConfigService);
+    
+    const transportOptions = this.buildTransportOptions(transport, config);
+    const microservice = await NestFactory.createMicroservice(
+      module,
+      transportOptions
+    );
+
+    microservice.useGlobalPipes(
+      new ValidationPipe({ whitelist: true, transform: true })
+    );
+    microservice.enableShutdownHooks();
+
+    await microservice.listen();
+    this.logger.log(
+      `Standalone ${transport.type.toUpperCase()} microservice is listening`
+    );
+
+    return microservice;
+  }
+
+  private static buildTransportOptions(
+    transport: TransportConfig,
+    config: ConfigService
+  ): NestMicroserviceOptions {
+    switch (transport.type) {
+      case "tcp":
+        return this.buildTcpOptions(transport, config);
+      case "redis":
+        return this.buildRedisOptions(transport, config);
+      case "rmq":
+        return this.buildRabbitMqOptions(transport, config);
+      case "nats":
+        return this.buildNatsOptions(transport, config);
+      default:
+        throw new Error(`Unknown transport type: ${(transport as any).type}`);
+    }
+  }
+
+  private static buildTcpOptions(
+    transport: TcpTransportConfig,
+    config: ConfigService
+  ): NestMicroserviceOptions {
+    return {
+      transport: Transport.TCP,
+      options: {
+        host: transport.host ?? config.get<string>("TCP_HOST", "0.0.0.0"),
+        port: transport.port ?? config.get<number>("TCP_PORT", 3001),
+        retryAttempts: transport.retryAttempts ?? 5,
+        retryDelay: transport.retryDelay ?? 1000,
+      },
+    };
+  }
+
+  private static buildRedisOptions(
+    transport: RedisTransportConfig,
+    config: ConfigService
+  ): NestMicroserviceOptions {
+    return {
+      transport: Transport.REDIS,
+      options: {
+        host: transport.host ?? config.get<string>("REDIS_HOST", "localhost"),
+        port: transport.port ?? config.get<number>("REDIS_PORT", 6379),
+        password: transport.password ?? config.get<string>("REDIS_PASSWORD"),
+        retryAttempts: transport.retryAttempts ?? 5,
+        retryDelay: transport.retryDelay ?? 1000,
+      },
+    };
+  }
+
+  private static buildRabbitMqOptions(
+    transport: RabbitMqTransportConfig,
+    config: ConfigService
+  ): NestMicroserviceOptions {
+    return {
+      transport: Transport.RMQ,
+      options: {
+        urls: transport.urls ?? [
+          config.get<string>("RABBITMQ_URL", "amqp://localhost:5672"),
+        ],
+        queue:
+          transport.queue ?? config.get<string>("RABBITMQ_QUEUE", "main_queue"),
+        queueOptions: transport.queueOptions ?? { durable: true },
+        noAck: false,
+        prefetchCount: transport.prefetchCount ?? 1,
+      },
+    };
+  }
+
+  private static buildNatsOptions(
+    transport: NatsTransportConfig,
+    config: ConfigService
+  ): NestMicroserviceOptions {
+    return {
+      transport: Transport.NATS,
+      options: {
+        servers: transport.servers ?? [
+          config.get<string>("NATS_URL", "nats://localhost:4222"),
+        ],
+      },
+    };
+  }
+
+  private static setupLogging() {
+    // Note: For detailed microservice request logging, 
+    // use an interceptor in your app module
+    this.logger.log("Request logging enabled");
+  }
+
+  private static setupGracefulShutdown() {
+    this.app.enableShutdownHooks();
+
+    const shutdown = async (signal: string) => {
+      this.logger.log(`${signal} received, shutting down gracefully...`);
+      try {
+        await this.app.close();
+        this.logger.log("Application closed successfully");
+        process.exit(0);
+      } catch (error) {
+        this.logger.error("Error during shutdown", error);
+        process.exit(1);
+      }
+    };
+
+    process.on("SIGTERM", () => shutdown("SIGTERM"));
+    process.on("SIGINT", () => shutdown("SIGINT"));
+  }
+
+  /**
+   * Get the application instance
+   */
+  static getApp() {
+    return this.app;
+  }
+}
+
+/* USAGE in main.ts:
+
+import { MicroserviceServer } from "./microservice/microservice.setup";
+import { AppModule } from "./app.module";
+
+// Hybrid app with TCP + Redis
+MicroserviceServer.create(AppModule, {
+  transports: [
+    { type: "tcp", port: 3001 },
+    { type: "redis", host: "localhost", port: 6379 },
+  ],
+  enableHttp: true,
+  httpPort: 3000,
+  globalPrefix: "api",
+  enableLogs: true,
 });
+
+// Standalone TCP microservice (no HTTP)
+MicroserviceServer.createStandalone(AppModule, { type: "tcp", port: 3001 });
+
+// RabbitMQ only
+MicroserviceServer.create(AppModule, {
+  transports: [
+    { type: "rmq", queue: "orders", queueOptions: { durable: true } },
+  ],
+  enableHttp: false,
+});
+
+
+// Example Controller with message patterns:
+
+import { Controller } from "@nestjs/common";
+import { MessagePattern, EventPattern, Payload, Ctx, RmqContext } from "@nestjs/microservices";
+
+@Controller()
+export class OrdersController {
+  @MessagePattern("orders.create")
+  async createOrder(@Payload() data: { productId: string; quantity: number }) {
+    // Process order - returns response to caller
+    return { orderId: crypto.randomUUID(), status: "created", ...data };
+  }
+
+  @MessagePattern("orders.findOne")
+  async findOrder(@Payload() data: { id: string }) {
+    return { orderId: data.id, status: "found" };
+  }
+
+  @EventPattern("orders.shipped")
+  async handleOrderShipped(@Payload() data: { orderId: string }) {
+    // Handle event - no response expected
+    console.log(`Order ${data.orderId} was shipped`);
+  }
+
+  // RabbitMQ with manual acknowledgement
+  @MessagePattern("orders.process")
+  async processOrder(
+    @Payload() data: any,
+    @Ctx() context: RmqContext
+  ) {
+    const channel = context.getChannelRef();
+    const originalMsg = context.getMessage();
+    
+    try {
+      // Process the order
+      const result = { processed: true, ...data };
+      channel.ack(originalMsg);
+      return result;
+    } catch (error) {
+      channel.nack(originalMsg);
+      throw error;
+    }
+  }
+}
+
+*/

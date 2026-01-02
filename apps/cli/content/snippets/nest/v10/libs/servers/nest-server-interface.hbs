@@ -1,0 +1,27 @@
+---
+name: nest-server-interface
+description: Server configuration options interface for NestJS HTTP servers
+dependencies: []
+devDependencies: []
+files:
+  - name: server.interface.ts
+---
+/**
+ * Server configuration options for NestJS HTTP servers
+ */
+export interface ServerOptions {
+  /** Server port (default: from config or 3000) */
+  port?: number;
+  /** Enable API versioning (default: false) */
+  enableVersioning?: boolean;
+  /** Default API version when versioning is enabled */
+  defaultVersion?: string;
+  /** Enable Swagger/OpenAPI documentation (default: true in development) */
+  enableApiDocumentation?: boolean;
+  /** Swagger documentation path (default: 'api/docs') */
+  swaggerPath?: string;
+  /** Enable request/response logging (default: true) */
+  enableServerLogs?: boolean;
+  /** Global API prefix (default: 'api') */
+  globalPrefix?: string;
+}
