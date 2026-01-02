@@ -1,0 +1,118 @@
+---
+name: http-exception-filter
+description: Global HTTP exception filter with structured error responses
+dependencies: []
+devDependencies: []
+files:
+  - name: filters/http-exception.filter.ts
+---
+import {
+  ExceptionFilter,
+  Catch,
+  ArgumentsHost,
+  HttpException,
+  HttpStatus,
+  Logger,
+} from "@nestjs/common";
+import { Request, Response } from "express";
+
+export interface ErrorResponse {
+  statusCode: number;
+  error: string;
+  message: string | string[];
+  path: string;
+  timestamp: string;
+  requestId?: string;
+  stack?: string;
+}
+
+@Catch(HttpException)
+export class HttpExceptionFilter implements ExceptionFilter {
+  private readonly logger = new Logger(HttpExceptionFilter.name);
+
+  catch(exception: HttpException, host: ArgumentsHost) {
+    const ctx = host.switchToHttp();
+    const response = ctx.getResponse<Response>();
+    const request = ctx.getRequest<Request>();
+    const status = exception.getStatus();
+    const exceptionResponse = exception.getResponse();
+
+    const errorResponse: ErrorResponse = {
+      statusCode: status,
+      error: this.getErrorName(status),
+      message: this.extractMessage(exceptionResponse),
+      path: request.url,
+      timestamp: new Date().toISOString(),
+      requestId: (request as any).id || request.headers["x-request-id"] as string,
+    };
+
+    // Include stack trace in development
+    if (process.env.NODE_ENV === "development") {
+      errorResponse.stack = exception.stack;
+    }
+
+    // Log error
+    if (status >= 500) {
+      this.logger.error(
+        `${request.method} ${request.url} - ${status}`,
+        exception.stack
+      );
+    } else if (status >= 400) {
+      this.logger.warn(
+        `${request.method} ${request.url} - ${status}: ${errorResponse.message}`
+      );
+    }
+
+    response.status(status).json(errorResponse);
+  }
+
+  private extractMessage(response: string | object): string | string[] {
+    if (typeof response === "string") {
+      return response;
+    }
+
+    if (typeof response === "object" && response !== null) {
+      const { message, errors } = response as any;
+      
+      // Handle validation errors array
+      if (Array.isArray(errors)) {
+        return errors;
+      }
+      
+      if (Array.isArray(message)) {
+        return message;
+      }
+      
+      if (typeof message === "string") {
+        return message;
+      }
+    }
+
+    return "An error occurred";
+  }
+
+  private getErrorName(status: number): string {
+    const errorNames: Record<number, string> = {
+      400: "Bad Request",
+      401: "Unauthorized",
+      403: "Forbidden",
+      404: "Not Found",
+      405: "Method Not Allowed",
+      406: "Not Acceptable",
+      408: "Request Timeout",
+      409: "Conflict",
+      410: "Gone",
+      413: "Payload Too Large",
+      415: "Unsupported Media Type",
+      422: "Unprocessable Entity",
+      429: "Too Many Requests",
+      500: "Internal Server Error",
+      501: "Not Implemented",
+      502: "Bad Gateway",
+      503: "Service Unavailable",
+      504: "Gateway Timeout",
+    };
+
+    return errorNames[status] || "Error";
+  }
+}

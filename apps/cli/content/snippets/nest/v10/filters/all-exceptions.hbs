@@ -1,0 +1,165 @@
+---
+name: all-exceptions-filter
+description: Catch-all exception filter for unhandled errors with error tracking integration
+dependencies: []
+devDependencies: []
+files:
+  - name: filters/all-exceptions.filter.ts
+---
+import {
+  ExceptionFilter,
+  Catch,
+  ArgumentsHost,
+  HttpException,
+  HttpStatus,
+  Logger,
+} from "@nestjs/common";
+import { Request, Response } from "express";
+
+export interface UnhandledErrorResponse {
+  statusCode: number;
+  error: string;
+  message: string;
+  path: string;
+  timestamp: string;
+  requestId?: string;
+  correlationId?: string;
+}
+
+@Catch()
+export class AllExceptionsFilter implements ExceptionFilter {
+  private readonly logger = new Logger(AllExceptionsFilter.name);
+
+  catch(exception: unknown, host: ArgumentsHost) {
+    const ctx = host.switchToHttp();
+    const response = ctx.getResponse<Response>();
+    const request = ctx.getRequest<Request>();
+
+    const { status, message, stack } = this.parseException(exception);
+
+    const errorResponse: UnhandledErrorResponse = {
+      statusCode: status,
+      error: status >= 500 ? "Internal Server Error" : "Error",
+      message: this.getSafeMessage(message, status),
+      path: request.url,
+      timestamp: new Date().toISOString(),
+      requestId: this.getRequestId(request),
+      correlationId: request.headers["x-correlation-id"] as string,
+    };
+
+    // Log the full error
+    this.logger.error(
+      `Unhandled exception: ${request.method} ${request.url}`,
+      {
+        status,
+        message,
+        stack,
+        userId: (request as any).user?.id,
+        body: this.sanitizeBody(request.body),
+        query: request.query,
+        headers: this.sanitizeHeaders(request.headers),
+      }
+    );
+
+    // Optional: Send to error tracking service
+    // this.errorTracker.captureException(exception, { request, user: (request as any).user });
+
+    response.status(status).json(errorResponse);
+  }
+
+  private parseException(exception: unknown): {
+    status: number;
+    message: string;
+    stack?: string;
+  } {
+    if (exception instanceof HttpException) {
+      return {
+        status: exception.getStatus(),
+        message: this.extractHttpExceptionMessage(exception),
+        stack: exception.stack,
+      };
+    }
+
+    if (exception instanceof Error) {
+      return {
+        status: HttpStatus.INTERNAL_SERVER_ERROR,
+        message: exception.message,
+        stack: exception.stack,
+      };
+    }
+
+    return {
+      status: HttpStatus.INTERNAL_SERVER_ERROR,
+      message: String(exception),
+    };
+  }
+
+  private extractHttpExceptionMessage(exception: HttpException): string {
+    const response = exception.getResponse();
+    
+    if (typeof response === "string") {
+      return response;
+    }
+    
+    if (typeof response === "object" && response !== null) {
+      const { message } = response as any;
+      if (Array.isArray(message)) {
+        return message.join(", ");
+      }
+      return message || exception.message;
+    }
+    
+    return exception.message;
+  }
+
+  private getSafeMessage(message: string, status: number): string {
+    // Hide internal error details in production for 5xx errors
+    if (
+      process.env.NODE_ENV === "production" &&
+      status >= 500
+    ) {
+      return "An unexpected error occurred. Please try again later.";
+    }
+    return message;
+  }
+
+  private getRequestId(request: Request): string | undefined {
+    return (
+      (request as any).id ||
+      (request.headers["x-request-id"] as string)
+    );
+  }
+
+  private sanitizeBody(body: any): any {
+    if (!body || typeof body !== "object") return body;
+
+    const sensitiveFields = [
+      "password",
+      "token",
+      "secret",
+      "apiKey",
+      "creditCard",
+      "ssn",
+    ];
+
+    const sanitized = { ...body };
+    for (const field of sensitiveFields) {
+      if (field in sanitized) {
+        sanitized[field] = "[REDACTED]";
+      }
+    }
+    return sanitized;
+  }
+
+  private sanitizeHeaders(headers: any): any {
+    const sanitized = { ...headers };
+    const sensitiveHeaders = ["authorization", "cookie", "x-api-key"];
+    
+    for (const header of sensitiveHeaders) {
+      if (header in sanitized) {
+        sanitized[header] = "[REDACTED]";
+      }
+    }
+    return sanitized;
+  }
+}
