@@ -5,63 +5,121 @@ dependencies:
   - elysia
   - "@elysiajs/swagger"
 devDependencies:
-  - "@types/node"
+  - "@types/bun"
 files:
   - name: src/index.ts
 ---
 import { Elysia, t } from "elysia";
 import { swagger } from "@elysiajs/swagger";
 
-const app = new Elysia()
-  .use(swagger({
-    documentation: {
-      info: {
-        title: "Elysia Production API",
-        version: "1.0.0",
+const isProd = process.env.NODE_ENV === "production";
+
+
+const getErrorMessage = (error: unknown): string => {
+  if (error instanceof Error) return error.message;
+
+  if (typeof error === "string") return error;
+
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    "message" in error &&
+    typeof (error as { message?: unknown }).message === "string"
+  ) {
+    return (error as { message: string }).message;
+  }
+
+  return "Unknown error";
+};
+
+
+export const startServer = () => {
+  const app = new Elysia({ name: "production-api" })
+
+    /* ----------------------------- */
+    /* Error definitions             */
+    /* ----------------------------- */
+    .error({
+      BadRequest: class BadRequest extends Error {},
+      Unauthorized: class Unauthorized extends Error {},
+      Forbidden: class Forbidden extends Error {},
+      NotFound: class NotFound extends Error {},
+    })
+
+    /* ----------------------------- */
+    /* Global error handler          */
+    /* ----------------------------- */
+    .onError(({ code, error, set }) => {
+      const statusMap: Record<string, number> = {
+        BadRequest: 400,
+        Unauthorized: 401,
+        Forbidden: 403,
+        NotFound: 404,
+        VALIDATION: 400,
+        INTERNAL_SERVER_ERROR: 500,
+      };
+
+      set.status = statusMap[code] ?? 500;
+
+      const message = getErrorMessage(error);
+
+      if (!isProd || set.status >= 500) {
+        console.error(`[${code}]`, error);
       }
+
+      return {
+        success: false,
+        code,
+        message:
+          isProd && set.status === 500 ? "Internal Server Error" : message,
+        timestamp: new Date().toISOString(),
+      };
+    });
+
+  if (!isProd) {
+    app.use(
+      swagger({
+        documentation: {
+          info: {
+            title: "Production API",
+            version: "1.0.0",
+          },
+        },
+      })
+    );
+  }
+
+  app.get(
+    "/health",
+    () => ({
+      status: "ok",
+      uptime: Math.floor(Bun.nanoseconds() / 1e9),
+      timestamp: new Date().toISOString(),
+    }),
+    {
+      response: t.Object({
+        status: t.String(),
+        uptime: t.Number(),
+        timestamp: t.String(),
+      }),
     }
-  }))
-  // Global error handling
-  .error({
-    BAD_REQUEST: 400,
-    UNAUTHORIZED: 401,
-    FORBIDDEN: 403,
-    NOT_FOUND: 404,
-    INTERNAL_SERVER_ERROR: 500
-  })
-  .onError(({ code, error, set }) => {
-    console.error(`[${code}] ${error.message}`);
-    
-    return {
-      success: false,
-      code,
-      message: process.env.NODE_ENV === "production" && code === "INTERNAL_SERVER_ERROR"
-        ? "Internal Server Error"
-        : error.message,
-    };
-  })
-  // Health check
-  .get("/health", () => ({
-    status: "ok",
-    uptime: process.uptime(),
-    timestamp: new Date().toISOString(),
-  }))
-  .get("/", () => ({ message: "Hello Elysia" }))
-  .listen(process.env.PORT || 3000);
+  );
 
-console.log(
-  `Elysia is running at ${app.server?.hostname}:${app.server?.port}`
-);
 
-// Graceful shutdown (Bun native)
-process.on("SIGTERM", () => {
-  console.log("SIGTERM received. Cleaning up...");
-  app.stop();
-  process.exit(0);
-});
+  app.get("/", () => ({ message: "Elysia API is running" }), {
+    response: t.Object({
+      message: t.String(),
+    }),
+  });
 
-process.on("SIGINT", () => {
-  console.log("SIGINT received. Cleaning up...");
-  app.stop();
-  process.exit(0);
-});
+  return app;
+};
+
+
+export const shutdown = async (app: Elysia, signal?: string) => {
+  if (signal) {
+    console.log(`${signal} received. Shutting down...`);
+  }
+
+  await app.stop();
+};

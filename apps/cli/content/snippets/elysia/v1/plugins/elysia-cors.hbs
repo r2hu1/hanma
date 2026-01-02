@@ -1,22 +1,43 @@
 ---
 name: elysia-cors
-description: CORS plugin for Elysia
+description: CORS plugin for Elysia with environment-based configuration
 dependencies:
-  - elysia
   - "@elysiajs/cors"
 files:
   - name: src/plugins/cors.ts
 ---
-import { Elysia } from "elysia";
+import type { Elysia } from "elysia";
 import { cors } from "@elysiajs/cors";
 
-export const setupCors = (app: Elysia) => {
+/**
+ * CORS configuration for Elysia
+ * Reads origins from environment variable for production safety
+ */
+export const setupCors = <T extends Elysia>(app: T) => {
+  const allowedOrigins = process.env.CORS_ORIGINS
+    ? process.env.CORS_ORIGINS.split(",").map((origin) => origin.trim())
+    : ["http://localhost:3000", "http://localhost:5173"];
+
   return app.use(
     cors({
-      origin: "http://localhost:3000",
-      methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-      allowedHeaders: ["Content-Type", "Authorization"],
+      origin: allowedOrigins,
+      methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+      allowedHeaders: ["Content-Type", "Authorization", "X-Request-ID"],
       credentials: true,
+      maxAge: 86400, // 24 hours
     })
   );
 };
+
+/* USAGE:
+
+import { Elysia } from "elysia";
+import { setupCors } from "./plugins/cors";
+
+const app = new Elysia();
+setupCors(app);
+
+// Or inline:
+app.use(setupCors);
+
+*/
