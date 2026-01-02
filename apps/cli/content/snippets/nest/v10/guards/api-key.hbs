@@ -1,0 +1,102 @@
+---
+name: api-key-guard
+description: API key authentication guard for machine-to-machine communication
+dependencies: []
+devDependencies: []
+files:
+  - name: guards/api-key.guard.ts
+---
+import {
+  Injectable,
+  CanActivate,
+  ExecutionContext,
+  UnauthorizedException,
+} from "@nestjs/common";
+import { Reflector } from "@nestjs/core";
+import { IS_PUBLIC_KEY } from "../decorators/public.decorator";
+import { timingSafeEqual } from "crypto";
+
+export const API_KEY_HEADER = "x-api-key";
+
+@Injectable()
+export class ApiKeyGuard implements CanActivate {
+  constructor(private reflector: Reflector) {}
+
+  canActivate(context: ExecutionContext): boolean {
+    // Check for public routes
+    const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
+
+    if (isPublic) {
+      return true;
+    }
+
+    const request = context.switchToHttp().getRequest();
+    const apiKey = this.extractApiKey(request);
+
+    if (!apiKey) {
+      throw new UnauthorizedException("API key is required");
+    }
+
+    const validApiKeys = this.getValidApiKeys();
+    const isValid = validApiKeys.some((validKey) =>
+      this.secureCompare(apiKey, validKey)
+    );
+
+    if (!isValid) {
+      throw new UnauthorizedException("Invalid API key");
+    }
+
+    // Optionally attach API key metadata to request
+    request.apiKeyId = this.getApiKeyId(apiKey, validApiKeys);
+
+    return true;
+  }
+
+  private extractApiKey(request: any): string | null {
+    // Check X-API-Key header
+    const headerKey = request.headers[API_KEY_HEADER];
+    if (headerKey) return headerKey;
+
+    // Check Authorization header with ApiKey scheme
+    const authHeader = request.headers.authorization;
+    if (authHeader?.startsWith("ApiKey ")) {
+      return authHeader.slice(7);
+    }
+
+    // Check query parameter (not recommended for production)
+    if (process.env.NODE_ENV === "development" && request.query?.api_key) {
+      return request.query.api_key;
+    }
+
+    return null;
+  }
+
+  private getValidApiKeys(): string[] {
+    // Load from environment or configuration
+    const keys = process.env.API_KEYS?.split(",") || [];
+    if (keys.length === 0) {
+      throw new Error("No API keys configured");
+    }
+    return keys;
+  }
+
+  private getApiKeyId(apiKey: string, validKeys: string[]): string {
+    const index = validKeys.findIndex((k) => this.secureCompare(apiKey, k));
+    return `key_${index}`;
+  }
+
+  // Timing-safe comparison to prevent timing attacks
+  private secureCompare(a: string, b: string): boolean {
+    if (a.length !== b.length) {
+      return false;
+    }
+
+    const bufA = Buffer.from(a);
+    const bufB = Buffer.from(b);
+
+    return timingSafeEqual(bufA, bufB);
+  }
+}

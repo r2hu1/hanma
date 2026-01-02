@@ -1,0 +1,72 @@
+---
+name: roles-guard
+description: Role-based access control guard working with Roles decorator
+dependencies: []
+devDependencies: []
+files:
+  - name: guards/roles.guard.ts
+---
+import {
+  Injectable,
+  CanActivate,
+  ExecutionContext,
+  ForbiddenException,
+} from "@nestjs/common";
+import { Reflector } from "@nestjs/core";
+import { ROLES_KEY, ROLES_ALL_KEY, Role } from "../decorators/roles.decorator";
+
+@Injectable()
+export class RolesGuard implements CanActivate {
+  constructor(private reflector: Reflector) {}
+
+  canActivate(context: ExecutionContext): boolean {
+    // Get required roles from decorator
+    const requiredRoles = this.reflector.getAllAndOverride<Role[]>(ROLES_KEY, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
+
+    const requiredAllRoles = this.reflector.getAllAndOverride<Role[]>(
+      ROLES_ALL_KEY,
+      [context.getHandler(), context.getClass()]
+    );
+
+    // No roles required - allow access
+    if (!requiredRoles?.length && !requiredAllRoles?.length) {
+      return true;
+    }
+
+    const request = context.switchToHttp().getRequest();
+    const user = request.user;
+
+    if (!user) {
+      throw new ForbiddenException("No user found in request");
+    }
+
+    const userRoles: Role[] = user.roles || [];
+
+    // Check if user has any of the required roles (OR logic)
+    if (requiredRoles?.length) {
+      const hasRole = requiredRoles.some((role) => userRoles.includes(role));
+      if (!hasRole) {
+        throw new ForbiddenException(
+          `Requires one of these roles: ${requiredRoles.join(", ")}`
+        );
+      }
+    }
+
+    // Check if user has all required roles (AND logic)
+    if (requiredAllRoles?.length) {
+      const hasAllRoles = requiredAllRoles.every((role) =>
+        userRoles.includes(role)
+      );
+      if (!hasAllRoles) {
+        throw new ForbiddenException(
+          `Requires all of these roles: ${requiredAllRoles.join(", ")}`
+        );
+      }
+    }
+
+    return true;
+  }
+}
