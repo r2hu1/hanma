@@ -1,0 +1,82 @@
+{
+  "id": "filters",
+  "title": "Filters",
+  "description": "Exception filters for error handling",
+  "subcategories": [
+    {
+      "id": "exception-filters",
+      "title": "Exception Handlers",
+      "description": "Filters for catching and formatting errors",
+      "snippets": [
+        {
+          "id": "http-exception-filter",
+          "name": "http-exception-filter",
+          "displayName": "HTTP Exception Filter",
+          "description": "Global HTTP exception handling",
+          "purpose": "Catch and format HTTP exceptions with consistent error responses.",
+          "features": [
+            "Structured error response",
+            "Request ID included",
+            "Status-based logging",
+            "Stack trace in dev"
+          ],
+          "usage": "// Global usage\napp.useGlobalFilters(new HttpExceptionFilter());",
+          "output": "src/filters/http-exception.filter.ts",
+          "dependencies": [],
+          "command": "npx hanma add http-exception-filter --framework nest"
+        },
+        {
+          "id": "all-exceptions-filter",
+          "name": "all-exceptions-filter",
+          "displayName": "All Exceptions Filter",
+          "description": "Catch-all exception filter",
+          "purpose": "Catch unhandled exceptions with sanitized logging and production-safe messages.",
+          "features": [
+            "Catches all errors",
+            "Sensitive data sanitization",
+            "Production-safe messages",
+            "Error tracking ready"
+          ],
+          "usage": "// Use as last filter\napp.useGlobalFilters(new AllExceptionsFilter());",
+          "output": "src/filters/all-exceptions.filter.ts",
+          "dependencies": [],
+          "command": "npx hanma add all-exceptions-filter --framework nest"
+        },
+        {
+          "id": "validation-filter",
+          "name": "validation-filter",
+          "displayName": "Validation Filter",
+          "description": "Validation exception handling",
+          "purpose": "Format validation errors with field-level details. Includes custom ValidationException.",
+          "features": [
+            "Field-level errors",
+            "Custom ValidationException",
+            "Helper functions",
+            "class-validator support"
+          ],
+          "usage": "throwValidationError('email', 'Email already exists');",
+          "output": "src/filters/validation.filter.ts",
+          "dependencies": [],
+          "command": "npx hanma add validation-filter --framework nest"
+        },
+        {
+          "id": "prisma-exception-filter",
+          "name": "prisma-exception-filter",
+          "displayName": "Prisma Exception Filter",
+          "description": "Prisma database error handling",
+          "purpose": "Convert Prisma error codes to user-friendly HTTP responses.",
+          "features": [
+            "Unique constraint errors",
+            "Not found errors",
+            "Foreign key errors",
+            "Validation errors"
+          ],
+          "usage": "// Add to global filters\napp.useGlobalFilters(new PrismaExceptionFilter());",
+          "output": "src/filters/prisma-exception.filter.ts",
+          "dependencies": ["@prisma/client"],
+          "command": "npx hanma add prisma-exception-filter --framework nest"
+        }
+      ]
+    }
+  ]
+}

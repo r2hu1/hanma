@@ -1,0 +1,106 @@
+{
+  "id": "pipes",
+  "title": "Pipes",
+  "description": "Validation and transformation pipes",
+  "subcategories": [
+    {
+      "id": "validation-pipes",
+      "title": "Validation",
+      "description": "Input validation with detailed errors",
+      "snippets": [
+        {
+          "id": "class-validator-pipe",
+          "name": "class-validator-pipe",
+          "displayName": "Class Validator Pipe",
+          "description": "Validation using class-validator",
+          "purpose": "Validate request data with class-validator decorators. Returns detailed field-level errors.",
+          "features": [
+            "Detailed error formatting",
+            "Nested validation support",
+            "Whitelist enabled",
+            "Transform enabled"
+          ],
+          "usage": "// Global usage\napp.useGlobalPipes(new ClassValidatorPipe());",
+          "output": "src/pipes/validation.pipe.ts",
+          "dependencies": ["class-validator", "class-transformer"],
+          "command": "npx hanma add class-validator-pipe --framework nest"
+        },
+        {
+          "id": "zod-validation-pipe",
+          "name": "zod-validation-pipe",
+          "displayName": "Zod Validation Pipe",
+          "description": "Validation using Zod schemas",
+          "purpose": "Validate request data with Zod schemas. Includes @ZodValidate decorator.",
+          "features": [
+            "@ZodValidate decorator",
+            "Detailed Zod errors",
+            "Per-route schemas",
+            "Type inference"
+          ],
+          "usage": "@ZodValidate(CreateUserSchema)\n@Post()\ncreate(@Body() dto: CreateUserDto) {}",
+          "output": "src/pipes/zod-validation.pipe.ts",
+          "dependencies": ["zod"],
+          "command": "npx hanma add zod-validation-pipe --framework nest"
+        }
+      ]
+    },
+    {
+      "id": "transform-pipes",
+      "title": "Transformation",
+      "description": "Input parsing and transformation",
+      "snippets": [
+        {
+          "id": "parse-uuid-pipe",
+          "name": "parse-uuid-pipe",
+          "displayName": "Parse UUID Pipe",
+          "description": "UUID parsing and validation",
+          "purpose": "Validate and parse UUID path/query parameters with version support.",
+          "features": [
+            "UUID version validation",
+            "Optional handling",
+            "Lower case normalization",
+            "Custom error messages"
+          ],
+          "usage": "@Get(':id')\nfindOne(@Param('id', ParseUuidPipe) id: string) {}",
+          "output": "src/pipes/parse-uuid.pipe.ts",
+          "dependencies": [],
+          "command": "npx hanma add parse-uuid-pipe --framework nest"
+        },
+        {
+          "id": "file-validation-pipe",
+          "name": "file-validation-pipe",
+          "displayName": "File Validation Pipe",
+          "description": "File upload validation",
+          "purpose": "Validate uploaded files for size, MIME type, and extension.",
+          "features": [
+            "Size limits",
+            "MIME type checking",
+            "Extension validation",
+            "Image/Document presets"
+          ],
+          "usage": "@UploadedFile(ImageValidationPipe) file: Express.Multer.File",
+          "output": "src/pipes/file-validation.pipe.ts",
+          "dependencies": [],
+          "command": "npx hanma add file-validation-pipe --framework nest"
+        },
+        {
+          "id": "trim-strings-pipe",
+          "name": "trim-strings-pipe",
+          "displayName": "Trim Strings Pipe",
+          "description": "Trim whitespace from strings",
+          "purpose": "Automatically trim whitespace from all string fields in request body.",
+          "features": [
+            "Recursive trimming",
+            "Include/exclude fields",
+            "Empty to null option",
+            "Array support"
+          ],
+          "usage": "// Global usage\napp.useGlobalPipes(new TrimStringsPipe());",
+          "output": "src/pipes/trim-strings.pipe.ts",
+          "dependencies": [],
+          "command": "npx hanma add trim-strings-pipe --framework nest"
+        }
+      ]
+    }
+  ]
+}

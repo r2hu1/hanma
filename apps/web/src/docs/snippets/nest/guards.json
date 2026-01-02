@@ -1,0 +1,89 @@
+{
+  "id": "guards",
+  "title": "Guards",
+  "description": "Authentication and authorization guards",
+  "subcategories": [
+    {
+      "id": "auth-guards",
+      "title": "Authentication",
+      "description": "Guards for verifying user identity",
+      "snippets": [
+        {
+          "id": "jwt-auth-guard",
+          "name": "jwt-auth-guard",
+          "displayName": "JWT Auth Guard",
+          "description": "JWT authentication with Passport",
+          "purpose": "Protect routes with JWT authentication. Supports public route bypass and detailed error messages.",
+          "features": [
+            "Passport integration",
+            "Public route support",
+            "Token expiration handling",
+            "Optional auth routes"
+          ],
+          "usage": "@UseGuards(JwtAuthGuard)\n@Get('protected')\nprotectedRoute() {}",
+          "output": "src/guards/jwt-auth.guard.ts",
+          "dependencies": ["@nestjs/passport", "passport-jwt", "jsonwebtoken"],
+          "command": "npx hanma add jwt-auth-guard --framework nest"
+        },
+        {
+          "id": "api-key-guard",
+          "name": "api-key-guard",
+          "displayName": "API Key Guard",
+          "description": "API key authentication for services",
+          "purpose": "Authenticate machine-to-machine communication with API keys.",
+          "features": [
+            "Timing-safe comparison",
+            "Multiple extraction methods",
+            "Multiple API keys support",
+            "Public route bypass"
+          ],
+          "usage": "@UseGuards(ApiKeyGuard)\n@Controller('api')\nexport class ApiController {}",
+          "output": "src/guards/api-key.guard.ts",
+          "dependencies": [],
+          "command": "npx hanma add api-key-guard --framework nest"
+        }
+      ]
+    },
+    {
+      "id": "authz-guards",
+      "title": "Authorization",
+      "description": "Guards for permission checking",
+      "snippets": [
+        {
+          "id": "roles-guard",
+          "name": "roles-guard",
+          "displayName": "Roles Guard",
+          "description": "Role-based access control",
+          "purpose": "Enforce role requirements on routes. Works with @Roles() decorator.",
+          "features": [
+            "OR logic (any role)",
+            "AND logic (all roles)",
+            "Custom error messages",
+            "Reflector integration"
+          ],
+          "usage": "@Roles(Role.ADMIN)\n@UseGuards(JwtAuthGuard, RolesGuard)\n@Get('admin')\nadminRoute() {}",
+          "output": "src/guards/roles.guard.ts",
+          "dependencies": [],
+          "command": "npx hanma add roles-guard --framework nest"
+        },
+        {
+          "id": "throttle-guard",
+          "name": "throttle-guard",
+          "displayName": "Throttle Guard",
+          "description": "Rate limiting guard",
+          "purpose": "Limit request rates per client. Supports per-route configuration.",
+          "features": [
+            "Customizable limits",
+            "@Throttle decorator",
+            "@SkipThrottle decorator",
+            "IP-based tracking"
+          ],
+          "usage": "@Throttle(5, 60)\n@Post('login')\nlogin() {}",
+          "output": "src/guards/throttle.guard.ts",
+          "dependencies": ["@nestjs/throttler"],
+          "command": "npx hanma add throttle-guard --framework nest"
+        }
+      ]
+    }
+  ]
+}
