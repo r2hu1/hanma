@@ -1,0 +1,196 @@
+---
+name: health-provider
+description: Health check indicators for database, Redis, and external services
+dependencies:
+  - "@nestjs/terminus"
+devDependencies: []
+files:
+  - name: providers/health.service.ts
+---
+import { Injectable } from "@nestjs/common";
+import {
+  HealthIndicator,
+  HealthIndicatorResult,
+  HealthCheckError,
+} from "@nestjs/terminus";
+
+// Generic health indicator base class
+@Injectable()
+export abstract class BaseHealthIndicator extends HealthIndicator {
+  protected abstract name: string;
+
+  abstract isHealthy(): Promise<HealthIndicatorResult>;
+
+  protected success(details?: Record<string, any>): HealthIndicatorResult {
+    return this.getStatus(this.name, true, details);
+  }
+
+  protected failure(error: string | Error): HealthIndicatorResult {
+    const message = error instanceof Error ? error.message : error;
+    throw new HealthCheckError(
+      `${this.name} health check failed`,
+      this.getStatus(this.name, false, { message })
+    );
+  }
+}
+
+// Database health indicator (Prisma example)
+@Injectable()
+export class DatabaseHealthIndicator extends BaseHealthIndicator {
+  protected name = "database";
+
+  constructor(private readonly prisma: any) { // Replace with PrismaService
+    super();
+  }
+
+  async isHealthy(): Promise<HealthIndicatorResult> {
+    try {
+      const start = Date.now();
+      await this.prisma.$queryRaw`SELECT 1`;
+      const responseTime = Date.now() - start;
+
+      return this.success({ responseTime: `${responseTime}ms` });
+    } catch (error) {
+      return this.failure(error as Error);
+    }
+  }
+}
+
+// Redis health indicator
+@Injectable()
+export class RedisHealthIndicator extends BaseHealthIndicator {
+  protected name = "redis";
+
+  constructor(private readonly redis: any) { // Replace with RedisService
+    super();
+  }
+
+  async isHealthy(): Promise<HealthIndicatorResult> {
+    try {
+      const start = Date.now();
+      const result = await this.redis.ping();
+      const responseTime = Date.now() - start;
+
+      if (result !== "PONG") {
+        return this.failure("Redis ping failed");
+      }
+
+      return this.success({ responseTime: `${responseTime}ms` });
+    } catch (error) {
+      return this.failure(error as Error);
+    }
+  }
+}
+
+// Memory health indicator
+@Injectable()
+export class MemoryHealthIndicator extends BaseHealthIndicator {
+  protected name = "memory";
+  private readonly maxHeapPercent: number;
+
+  constructor(maxHeapPercent = 90) {
+    super();
+    this.maxHeapPercent = maxHeapPercent;
+  }
+
+  async isHealthy(): Promise<HealthIndicatorResult> {
+    const memory = process.memoryUsage();
+    const heapUsedMB = Math.round(memory.heapUsed / 1024 / 1024);
+    const heapTotalMB = Math.round(memory.heapTotal / 1024 / 1024);
+    const heapPercent = Math.round((memory.heapUsed / memory.heapTotal) * 100);
+
+    if (heapPercent > this.maxHeapPercent) {
+      return this.failure(`Heap usage too high: ${heapPercent}%`);
+    }
+
+    return this.success({
+      heapUsed: `${heapUsedMB}MB`,
+      heapTotal: `${heapTotalMB}MB`,
+      heapPercent: `${heapPercent}%`,
+      rss: `${Math.round(memory.rss / 1024 / 1024)}MB`,
+    });
+  }
+}
+
+// External API health indicator
+@Injectable()
+export class ExternalApiHealthIndicator extends BaseHealthIndicator {
+  protected name = "external-api";
+  private readonly url: string;
+  private readonly timeoutMs: number;
+
+  constructor(name: string, url: string, timeoutMs = 5000) {
+    super();
+    this.name = name;
+    this.url = url;
+    this.timeoutMs = timeoutMs;
+  }
+
+  async isHealthy(): Promise<HealthIndicatorResult> {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
+
+    try {
+      const start = Date.now();
+      const response = await fetch(this.url, { signal: controller.signal });
+      const responseTime = Date.now() - start;
+
+      if (!response.ok) {
+        return this.failure(`HTTP ${response.status}`);
+      }
+
+      return this.success({ responseTime: `${responseTime}ms` });
+    } catch (error: any) {
+      if (error.name === "AbortError") {
+        return this.failure("Request timeout");
+      }
+      return this.failure(error);
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+}
+
+// Health controller example:
+/*
+import { Controller, Get } from "@nestjs/common";
+import { HealthCheck, HealthCheckService } from "@nestjs/terminus";
+import {
+  DatabaseHealthIndicator,
+  RedisHealthIndicator,
+  MemoryHealthIndicator,
+} from "./providers/health.service";
+
+@Controller("health")
+export class HealthController {
+  constructor(
+    private health: HealthCheckService,
+    private db: DatabaseHealthIndicator,
+    private redis: RedisHealthIndicator,
+    private memory: MemoryHealthIndicator,
+  ) {}
+
+  @Get()
+  @HealthCheck()
+  check() {
+    return this.health.check([
+      () => this.db.isHealthy(),
+      () => this.redis.isHealthy(),
+      () => this.memory.isHealthy(),
+    ]);
+  }
+
+  @Get("live")
+  liveness() {
+    return { status: "ok" };
+  }
+
+  @Get("ready")
+  @HealthCheck()
+  readiness() {
+    return this.health.check([
+      () => this.db.isHealthy(),
+    ]);
+  }
+}
+*/

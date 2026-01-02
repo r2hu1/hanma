@@ -1,0 +1,177 @@
+---
+name: logger-provider
+description: Custom logger service using Winston or Pino with structured logging
+dependencies:
+  - "winston"
+devDependencies:
+  - "@types/node"
+files:
+  - name: providers/logger.service.ts
+---
+import { Injectable, LoggerService, Scope } from "@nestjs/common";
+import * as winston from "winston";
+
+const { combine, timestamp, printf, colorize, errors } = winston.format;
+
+// Custom log format
+const logFormat = printf(({ level, message, timestamp, context, trace, ...meta }) => {
+  let log = `${timestamp} [${level}]`;
+  if (context) log += ` [${context}]`;
+  log += ` ${message}`;
+  
+  if (Object.keys(meta).length > 0) {
+    log += ` ${JSON.stringify(meta)}`;
+  }
+  
+  if (trace) log += `\n${trace}`;
+  
+  return log;
+});
+
+// JSON format for production
+const jsonFormat = combine(
+  timestamp(),
+  errors({ stack: true }),
+  winston.format.json()
+);
+
+// Pretty format for development
+const devFormat = combine(
+  colorize({ all: true }),
+  timestamp({ format: "HH:mm:ss" }),
+  errors({ stack: true }),
+  logFormat
+);
+
+@Injectable({ scope: Scope.TRANSIENT })
+export class CustomLogger implements LoggerService {
+  private logger: winston.Logger;
+  private context?: string;
+
+  constructor() {
+    this.logger = winston.createLogger({
+      level: process.env.LOG_LEVEL || (process.env.NODE_ENV === "production" ? "info" : "debug"),
+      format: process.env.NODE_ENV === "production" ? jsonFormat : devFormat,
+      transports: [
+        new winston.transports.Console(),
+        // Add file transport for production
+        ...(process.env.NODE_ENV === "production"
+          ? [
+              new winston.transports.File({
+                filename: "logs/error.log",
+                level: "error",
+              }),
+              new winston.transports.File({
+                filename: "logs/combined.log",
+              }),
+            ]
+          : []),
+      ],
+    });
+  }
+
+  setContext(context: string) {
+    this.context = context;
+    return this;
+  }
+
+  log(message: string, context?: string) {
+    this.logger.info(message, { context: context || this.context });
+  }
+
+  error(message: string, trace?: string, context?: string) {
+    this.logger.error(message, {
+      context: context || this.context,
+      trace,
+    });
+  }
+
+  warn(message: string, context?: string) {
+    this.logger.warn(message, { context: context || this.context });
+  }
+
+  debug(message: string, context?: string) {
+    this.logger.debug(message, { context: context || this.context });
+  }
+
+  verbose(message: string, context?: string) {
+    this.logger.verbose(message, { context: context || this.context });
+  }
+
+  // Extended logging with metadata
+  info(message: string, meta?: Record<string, any>) {
+    this.logger.info(message, { context: this.context, ...meta });
+  }
+
+  // Log with request context
+  logWithRequest(
+    message: string,
+    req: { id?: string; user?: { id: string } },
+    meta?: Record<string, any>
+  ) {
+    this.logger.info(message, {
+      context: this.context,
+      requestId: req.id,
+      userId: req.user?.id,
+      ...meta,
+    });
+  }
+
+  // Measure execution time
+  async measureTime<T>(
+    label: string,
+    fn: () => Promise<T>
+  ): Promise<T> {
+    const start = Date.now();
+    try {
+      const result = await fn();
+      const duration = Date.now() - start;
+      this.logger.debug(`${label} completed`, {
+        context: this.context,
+        duration: `${duration}ms`,
+      });
+      return result;
+    } catch (error) {
+      const duration = Date.now() - start;
+      this.logger.error(`${label} failed`, {
+        context: this.context,
+        duration: `${duration}ms`,
+        error: (error as Error).message,
+      });
+      throw error;
+    }
+  }
+}
+
+// Usage in main.ts:
+/*
+import { NestFactory } from "@nestjs/core";
+import { CustomLogger } from "./providers/logger.service";
+import { AppModule } from "./app.module";
+
+async function bootstrap() {
+  const app = await NestFactory.create(AppModule, {
+    bufferLogs: true,
+  });
+  
+  app.useLogger(app.get(CustomLogger));
+  
+  await app.listen(3000);
+}
+*/
+
+// Usage in services:
+/*
+@Injectable()
+export class UserService {
+  constructor(private readonly logger: CustomLogger) {
+    this.logger.setContext(UserService.name);
+  }
+
+  async findOne(id: string) {
+    return this.logger.measureTime("findOne", async () => {
+      // ... database query
+    });
+  }
+}
+*/
