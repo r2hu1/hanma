@@ -1,0 +1,90 @@
+---
+name: parse-uuid-pipe
+description: Custom UUID parsing and validation pipe with version support
+dependencies: []
+devDependencies: []
+files:
+  - name: pipes/parse-uuid.pipe.ts
+---
+import {
+  PipeTransform,
+  Injectable,
+  BadRequestException,
+  ArgumentMetadata,
+} from "@nestjs/common";
+
+type UuidVersion = 1 | 2 | 3 | 4 | 5 | "all";
+
+const UUID_REGEX: Record<UuidVersion, RegExp> = {
+  1: /^[0-9a-f]{8}-[0-9a-f]{4}-1[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+  2: /^[0-9a-f]{8}-[0-9a-f]{4}-2[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+  3: /^[0-9a-f]{8}-[0-9a-f]{4}-3[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+  4: /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+  5: /^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+  all: /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+};
+
+export interface ParseUuidPipeOptions {
+  version?: UuidVersion;
+  optional?: boolean;
+  errorHttpStatusCode?: number;
+}
+
+@Injectable()
+export class ParseUuidPipe implements PipeTransform<string> {
+  private readonly version: UuidVersion;
+  private readonly optional: boolean;
+
+  constructor(options: ParseUuidPipeOptions = {}) {
+    this.version = options.version ?? "all";
+    this.optional = options.optional ?? false;
+  }
+
+  transform(value: string, metadata: ArgumentMetadata): string {
+    // Handle optional values
+    if (this.optional && (value === undefined || value === null)) {
+      return value;
+    }
+
+    if (!value) {
+      throw new BadRequestException(
+        `Validation failed (uuid is expected for ${metadata.data || "parameter"})`
+      );
+    }
+
+    const regex = UUID_REGEX[this.version];
+    
+    if (!regex.test(value)) {
+      const versionMessage =
+        this.version === "all"
+          ? "valid UUID"
+          : `UUID version ${this.version}`;
+          
+      throw new BadRequestException(
+        `Validation failed (${versionMessage} expected for ${metadata.data || "parameter"})`
+      );
+    }
+
+    return value.toLowerCase();
+  }
+}
+
+// Usage examples:
+/*
+import { ParseUuidPipe } from "./pipes/parse-uuid.pipe";
+
+@Controller("users")
+export class UsersController {
+  // Default - accepts any UUID version
+  @Get(":id")
+  findOne(@Param("id", ParseUuidPipe) id: string) {}
+
+  // Specific version
+  @Get("v4/:id")
+  findOneV4(@Param("id", new ParseUuidPipe({ version: 4 })) id: string) {}
+
+  // Optional UUID
+  @Get()
+  findAll(@Query("parentId", new ParseUuidPipe({ optional: true })) parentId?: string) {}
+}
+*/

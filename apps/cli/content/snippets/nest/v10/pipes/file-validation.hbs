@@ -1,0 +1,157 @@
+---
+name: file-validation-pipe
+description: File upload validation pipe for size, mime type, and extension checking
+dependencies: []
+devDependencies: []
+files:
+  - name: pipes/file-validation.pipe.ts
+---
+import {
+  PipeTransform,
+  Injectable,
+  BadRequestException,
+  PayloadTooLargeException,
+  UnsupportedMediaTypeException,
+} from "@nestjs/common";
+
+export interface FileValidationOptions {
+  maxSize?: number; // bytes
+  allowedMimeTypes?: string[];
+  allowedExtensions?: string[];
+  required?: boolean;
+}
+
+interface UploadedFile {
+  fieldname: string;
+  originalname: string;
+  encoding: string;
+  mimetype: string;
+  size: number;
+  buffer?: Buffer;
+  destination?: string;
+  filename?: string;
+  path?: string;
+}
+
+const DEFAULT_MAX_SIZE = 5 * 1024 * 1024; // 5MB
+
+const MIME_TYPE_PRESETS = {
+  images: ["image/jpeg", "image/png", "image/gif", "image/webp", "image/svg+xml"],
+  documents: [
+    "application/pdf",
+    "application/msword",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "application/vnd.ms-excel",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "text/plain",
+  ],
+  videos: ["video/mp4", "video/webm", "video/ogg", "video/quicktime"],
+  audio: ["audio/mpeg", "audio/wav", "audio/ogg", "audio/webm"],
+};
+
+@Injectable()
+export class FileValidationPipe implements PipeTransform<UploadedFile | UploadedFile[]> {
+  private options: Required<FileValidationOptions>;
+
+  constructor(options: FileValidationOptions = {}) {
+    this.options = {
+      maxSize: options.maxSize ?? DEFAULT_MAX_SIZE,
+      allowedMimeTypes: options.allowedMimeTypes ?? [],
+      allowedExtensions: options.allowedExtensions ?? [],
+      required: options.required ?? true,
+    };
+  }
+
+  transform(file: UploadedFile | UploadedFile[]): UploadedFile | UploadedFile[] {
+    if (Array.isArray(file)) {
+      return file.map((f) => this.validateFile(f));
+    }
+    return this.validateFile(file);
+  }
+
+  private validateFile(file: UploadedFile): UploadedFile {
+    // Check if file is required
+    if (!file) {
+      if (this.options.required) {
+        throw new BadRequestException("File is required");
+      }
+      return file;
+    }
+
+    // Validate size
+    if (file.size > this.options.maxSize) {
+      const maxSizeMB = (this.options.maxSize / (1024 * 1024)).toFixed(2);
+      const fileSizeMB = (file.size / (1024 * 1024)).toFixed(2);
+      throw new PayloadTooLargeException(
+        `File size (${fileSizeMB}MB) exceeds maximum allowed size (${maxSizeMB}MB)`
+      );
+    }
+
+    // Validate MIME type
+    if (
+      this.options.allowedMimeTypes.length > 0 &&
+      !this.options.allowedMimeTypes.includes(file.mimetype)
+    ) {
+      throw new UnsupportedMediaTypeException(
+        `File type "${file.mimetype}" is not allowed. Allowed types: ${this.options.allowedMimeTypes.join(", ")}`
+      );
+    }
+
+    // Validate extension
+    if (this.options.allowedExtensions.length > 0) {
+      const ext = this.getExtension(file.originalname);
+      if (!this.options.allowedExtensions.includes(ext.toLowerCase())) {
+        throw new UnsupportedMediaTypeException(
+          `File extension "${ext}" is not allowed. Allowed extensions: ${this.options.allowedExtensions.join(", ")}`
+        );
+      }
+    }
+
+    return file;
+  }
+
+  private getExtension(filename: string): string {
+    const parts = filename.split(".");
+    return parts.length > 1 ? `.${parts.pop()!}` : "";
+  }
+}
+
+// Preset pipes for common use cases
+export const ImageValidationPipe = new FileValidationPipe({
+  maxSize: 10 * 1024 * 1024, // 10MB
+  allowedMimeTypes: MIME_TYPE_PRESETS.images,
+  allowedExtensions: [".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg"],
+});
+
+export const DocumentValidationPipe = new FileValidationPipe({
+  maxSize: 20 * 1024 * 1024, // 20MB
+  allowedMimeTypes: MIME_TYPE_PRESETS.documents,
+  allowedExtensions: [".pdf", ".doc", ".docx", ".xls", ".xlsx", ".txt"],
+});
+
+// Usage:
+/*
+import { FileInterceptor } from "@nestjs/platform-express";
+import { FileValidationPipe, ImageValidationPipe } from "./pipes/file-validation.pipe";
+
+@Controller("upload")
+export class UploadController {
+  @Post("image")
+  @UseInterceptors(FileInterceptor("file"))
+  uploadImage(@UploadedFile(ImageValidationPipe) file: Express.Multer.File) {
+    return { filename: file.filename };
+  }
+
+  @Post("custom")
+  @UseInterceptors(FileInterceptor("file"))
+  uploadCustom(
+    @UploadedFile(new FileValidationPipe({
+      maxSize: 50 * 1024 * 1024, // 50MB
+      allowedMimeTypes: ["video/mp4"],
+    }))
+    file: Express.Multer.File
+  ) {
+    return { filename: file.filename };
+  }
+}
+*/
