@@ -238,7 +238,7 @@ export function clearDocsCache(): void {
 // ============================================================================
 
 import type { SearchItem } from "@/types/docs";
-import { type SnippetDoc, type SnippetCategory } from "@/types/docs";
+import { type SnippetCategory } from "@/types/docs";
 
 /**
  * Load ALL searchable data from all frameworks and sections.

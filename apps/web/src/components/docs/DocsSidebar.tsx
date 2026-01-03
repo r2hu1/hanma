@@ -41,12 +41,7 @@ const DocsSidebarComponent = ({
   templatesData,
   addonsData,
 }: DocsSidebarProps) => {
-  const {
-    searchQuery,
-    setSearchQuery,
-    expandedFramework,
-    setExpandedFramework,
-  } = useUIStore();
+  const { searchQuery, expandedFramework, setExpandedFramework } = useUIStore();
   const { setSearchOpen } = useDocsStore();
 
   const filteredCategories = useMemo(() => {
