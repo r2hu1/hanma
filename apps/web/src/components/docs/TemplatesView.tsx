@@ -3,12 +3,31 @@ import { TemplateCard } from "./TemplateCard";
 import { CodeBlock } from "./CodeBlock";
 import { FeatureTemplateCard } from "./FeatureTemplateCard";
 
+import { useEffect } from "react";
+import { useLocation } from "react-router-dom";
+
 interface TemplatesViewProps {
   data: TemplatesData;
   activeCategory: string;
 }
 
 export const TemplatesView = ({ data, activeCategory }: TemplatesViewProps) => {
+  const location = useLocation();
+
+  // Handle deep linking scroll
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const itemId = params.get("item");
+
+    if (itemId) {
+      setTimeout(() => {
+        const element = document.getElementById(itemId);
+        if (element) {
+          element.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+      }, 100);
+    }
+  }, [location.search, activeCategory, data]);
   // Show overview when no category is selected
   const showOverview = activeCategory === "";
 
@@ -78,7 +97,13 @@ export const TemplatesView = ({ data, activeCategory }: TemplatesViewProps) => {
             {category.templates && (
               <div className="space-y-4">
                 {category.templates.map((template) => (
-                  <TemplateCard key={template.id} template={template} />
+                  <div
+                    key={template.id}
+                    id={template.id}
+                    className="scroll-mt-20"
+                  >
+                    <TemplateCard template={template} />
+                  </div>
                 ))}
               </div>
             )}
@@ -97,10 +122,13 @@ export const TemplatesView = ({ data, activeCategory }: TemplatesViewProps) => {
                     )}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       {subcat.templates.map((template) => (
-                        <FeatureTemplateCard
+                        <div
                           key={template.id}
-                          template={template}
-                        />
+                          id={template.id}
+                          className="scroll-mt-20 h-full"
+                        >
+                          <FeatureTemplateCard template={template} />
+                        </div>
                       ))}
                     </div>
                   </div>

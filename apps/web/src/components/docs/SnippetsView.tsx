@@ -10,11 +10,32 @@ interface SnippetsViewProps {
   activeFramework: FrameworkType | "shared" | "tooling";
 }
 
+import { useEffect } from "react";
+import { useLocation } from "react-router-dom";
+
 export const SnippetsView = ({
   data,
   activeCategory,
   activeFramework,
 }: SnippetsViewProps) => {
+  const location = useLocation();
+
+  // Handle deep linking scroll
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const itemId = params.get("item");
+
+    if (itemId) {
+      // Small timeout to ensure DOM is ready and layout is settled
+      setTimeout(() => {
+        const element = document.getElementById(itemId);
+        if (element) {
+          element.scrollIntoView({ behavior: "smooth", block: "start" });
+          // Highlight effect could be added here
+        }
+      }, 100);
+    }
+  }, [location.search, activeCategory, data]);
   // Show intro when no category is selected (default/overview state)
   const showIntro = activeCategory === "";
 
@@ -50,11 +71,16 @@ export const SnippetsView = ({
 
                 <div className="space-y-4">
                   {subcat.snippets.map((snippet) => (
-                    <SnippetCard
+                    <div
                       key={snippet.id}
-                      snippet={snippet}
-                      framework={activeFramework}
-                    />
+                      id={snippet.id}
+                      className="scroll-mt-20"
+                    >
+                      <SnippetCard
+                        snippet={snippet}
+                        framework={activeFramework}
+                      />
+                    </div>
                   ))}
                 </div>
               </div>

@@ -14,6 +14,7 @@ import { ThemeToggle } from "../theme/Toggle";
 import { FRAMEWORKS, TEMPLATE_FRAMEWORKS } from "@/constants/docs.constants";
 import { filterCategories } from "@/utils/docs.utils";
 import { NavButton, SidebarSection, CategoryList } from "./SidebarSections";
+import { useDocsStore } from "@/stores/docsStore";
 
 interface DocsSidebarProps {
   activeTab: TabType;
@@ -46,6 +47,7 @@ const DocsSidebarComponent = ({
     expandedFramework,
     setExpandedFramework,
   } = useUIStore();
+  const { setSearchOpen } = useDocsStore();
 
   const filteredCategories = useMemo(() => {
     const data = activeTab === "addons" ? addonsData : snippetsData;
@@ -65,17 +67,21 @@ const DocsSidebarComponent = ({
 
         {/* Search Bar */}
         <div className="relative mb-4">
-          <LuSearch
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-muted"
-            size={16}
-          />
-          <input
-            type="text"
-            placeholder="Search docs..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-3 py-2 bg-background border border-border rounded-lg text-sm text-foreground placeholder:text-muted focus:outline-none focus:border-primary/50 transition-colors"
-          />
+          <button
+            onClick={() => setSearchOpen(true)}
+            className="w-full pl-9 pr-3 py-2 bg-background border border-border rounded-lg text-sm text-muted text-left hover:border-primary/50 transition-colors flex items-center justify-between group"
+          >
+            <span className="flex items-center">
+              <LuSearch
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-muted group-hover:text-foreground transition-colors"
+                size={16}
+              />
+              <span className="ml-1">Search docs...</span>
+            </span>
+            <kbd className="hidden sm:inline-flex h-5 select-none items-center gap-1 rounded border border-border bg-muted/20 px-1.5 font-mono text-[10px] font-medium opacity-100">
+              <span className="text-xs">⌘K</span>
+            </kbd>
+          </button>
         </div>
 
         {/* Frameworks Section */}
