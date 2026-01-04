@@ -33,10 +33,12 @@ const getErrorMessage = (error: unknown): string => {
 };
 
 // Store app instance for shutdown
-let appInstance: Elysia | null = null;
+// Using flexible type since Elysia's decorator chain creates complex types
+let appInstance: { stop: () => Promise<void> } | null = null;
 
-export const startServer = (): Elysia => {
-  const app = new Elysia({ name: "production-api" })
+export const startServer = () => {
+  // Create base app with error handling
+  let app = new Elysia({ name: "production-api" })
 
     /* ----------------------------- */
     /* Error definitions             */
@@ -78,41 +80,42 @@ export const startServer = (): Elysia => {
       };
     });
 
+  // Add swagger in dev mode
   if (!isProd) {
-    app.use(
+    app = app.use(
       swagger({
         documentation: {
           info: {
-            title: process.env.npm_package_name,
-            version: process.env.npm_package_version,
+            title: process.env.npm_package_name || "API",
+            version: process.env.npm_package_version || "1.0.0",
           },
         },
       })
     );
   }
 
-  app.get(
-    "/health",
-    () => ({
-      status: "ok",
-      uptime: Math.floor(Bun.nanoseconds() / 1e9),
-      timestamp: new Date().toISOString(),
-    }),
-    {
-      response: t.Object({
-        status: t.String(),
-        uptime: t.Number(),
-        timestamp: t.String(),
+  // Add routes
+  app
+    .get(
+      "/health",
+      () => ({
+        status: "ok",
+        uptime: Math.floor(Bun.nanoseconds() / 1e9),
+        timestamp: new Date().toISOString(),
       }),
-    }
-  );
-
-
-  app.get("/", () => ({ message: "Elysia API is running" }), {
-    response: t.Object({
-      message: t.String(),
-    }),
-  });
+      {
+        response: t.Object({
+          status: t.String(),
+          uptime: t.Number(),
+          timestamp: t.String(),
+        }),
+      }
+    )
+    .get("/", () => ({ message: "Elysia API is running" }), {
+      response: t.Object({
+        message: t.String(),
+      }),
+    });
 
   // Store instance and start listening
   appInstance = app;
@@ -129,9 +132,21 @@ export const startServer = (): Elysia => {
 };
 
 
+let isShuttingDown = false;
+
 export const shutdown = async (signal: string) => {
-  if (!appInstance) return;
+  // Prevent multiple shutdown attempts
+  if (isShuttingDown || !appInstance) return;
+  isShuttingDown = true;
   
   console.log(`${signal} received. Shutting down...`);
-  await appInstance.stop();
+  
+  try {
+    await appInstance.stop();
+  } catch (err) {
+    // Ignore errors if already stopped
+  }
+  
+  appInstance = null;
+  process.exit(0);
 };

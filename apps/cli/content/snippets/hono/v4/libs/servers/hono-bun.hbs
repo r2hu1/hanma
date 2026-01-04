@@ -174,34 +174,20 @@ export const startServer = () => {
     },
   });
 
-  console.log(JSON.stringify({
-    level: "info",
-    message: "Server started",
-    port: server.port,
-    environment: config.env,
-    timestamp: new Date().toISOString(),
-  }));
+  console.log(`Hono running on http://localhost:${server.port}`);
 };
 
 // Graceful shutdown
-export const shutdown = (signal: string) => {
-  if (!server) return;
+let isShuttingDown = false;
 
-  console.log(JSON.stringify({
-    level: "info",
-    message: `${signal} received, shutting down gracefully`,
-    timestamp: new Date().toISOString(),
-  }));
+export const shutdown = (signal: string) => {
+  if (isShuttingDown || !server) return;
+  isShuttingDown = true;
+
+  console.log(`${signal} received. Shutting down...`);
   
   server.stop();
   
-  // Allow pending requests to complete
-  setTimeout(() => {
-    console.log(JSON.stringify({
-      level: "info",
-      message: "Server stopped",
-      timestamp: new Date().toISOString(),
-    }));
-    process.exit(0);
-  }, 5000);
+  console.log("Server stopped");
+  process.exit(0);
 };
