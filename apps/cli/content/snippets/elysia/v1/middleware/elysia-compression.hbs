@@ -1,0 +1,128 @@
+---
+name: elysia-compression
+description: Response compression middleware using Bun's native gzip compression
+dependencies: []
+devDependencies: []
+files:
+  - name: src/middleware/compression.ts
+---
+import { Elysia } from "elysia";
+
+export interface CompressionOptions {
+  /** Minimum size in bytes before compression is applied (default: 1024) */
+  threshold?: number;
+  /** Compression level 1-9 (default: 6) */
+  level?: number;
+  /** Content types to compress (default: text/*, application/json, application/javascript) */
+  contentTypes?: string[];
+}
+
+const shouldCompress = (
+  contentType: string | null,
+  allowedTypes: string[]
+): boolean => {
+  if (!contentType) return false;
+
+  return allowedTypes.some((type) => {
+    if (type.endsWith("/*")) {
+      return contentType.startsWith(type.slice(0, -1));
+    }
+    return contentType.includes(type);
+  });
+};
+
+/**
+ * Compression middleware for Elysia
+ * Uses Bun's native gzip compression
+ */
+export const compression = (options: CompressionOptions = {}) => {
+  const config = {
+    threshold: options.threshold ?? 1024,
+    level: Math.min(9, Math.max(1, options.level ?? 6)),
+    contentTypes: options.contentTypes ?? [
+      "text/*",
+      "application/json",
+      "application/javascript",
+      "application/xml",
+      "image/svg+xml",
+    ],
+  };
+
+  return new Elysia({ name: "compression" })
+    .mapResponse(({ response, set, request }) => {
+      // Check if client accepts gzip
+      const acceptEncoding = request.headers.get("accept-encoding") ?? "";
+      if (!acceptEncoding.includes("gzip")) {
+        return response;
+      }
+
+      // Skip if already compressed
+      if (set.headers["Content-Encoding"]) {
+        return response;
+      }
+
+      // Get response body
+      let body: string | null = null;
+      let contentType = set.headers["Content-Type"] ?? set.headers["content-type"];
+
+      if (typeof response === "string") {
+        body = response;
+        contentType = contentType ?? "text/plain";
+      } else if (typeof response === "object" && response !== null) {
+        body = JSON.stringify(response);
+        contentType = contentType ?? "application/json";
+      }
+
+      if (!body) return response;
+
+      // Check content type
+      if (!shouldCompress(contentType, config.contentTypes)) {
+        return response;
+      }
+
+      // Check threshold
+      const bodySize = new TextEncoder().encode(body).length;
+      if (bodySize < config.threshold) {
+        return response;
+      }
+
+      // Compress using Bun
+      const compressed = Bun.gzipSync(body, { level: config.level });
+
+      set.headers["Content-Encoding"] = "gzip";
+      set.headers["Vary"] = "Accept-Encoding";
+
+      return new Response(compressed, {
+        headers: {
+          "Content-Type": contentType,
+          "Content-Encoding": "gzip",
+          "Vary": "Accept-Encoding",
+        },
+      });
+    });
+};
+
+/* USAGE:
+
+import { Elysia } from "elysia";
+import { compression } from "./middleware/compression";
+
+const app = new Elysia()
+  .use(compression())
+  .get("/", () => "Hello World")
+  .get("/large", () => {
+    // Large JSON response will be compressed
+    return { data: Array(1000).fill({ id: 1, name: "test" }) };
+  })
+  .listen(3000);
+
+// With custom options
+const app = new Elysia()
+  .use(compression({
+    threshold: 512, // Compress responses larger than 512 bytes
+    level: 9, // Maximum compression
+    contentTypes: ["text/*", "application/json"],
+  }))
+  .listen(3000);
+
+*/

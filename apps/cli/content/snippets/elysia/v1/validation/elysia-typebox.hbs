@@ -1,0 +1,244 @@
+---
+name: elysia-typebox
+description: Advanced TypeBox validation patterns with custom validators and reusable schemas
+dependencies: []
+devDependencies: []
+files:
+  - name: src/validation/typebox.ts
+---
+import { t, Static } from "elysia";
+
+/**
+ * Custom string formats
+ */
+export const str = {
+  /** Non-empty string */
+  required: (options?: { minLength?: number; maxLength?: number }) =>
+    t.String({
+      minLength: options?.minLength ?? 1,
+      maxLength: options?.maxLength,
+      error: "This field is required",
+    }),
+
+  /** Email address */
+  email: () =>
+    t.String({
+      format: "email",
+      error: "Invalid email address",
+    }),
+
+  /** UUID v4 */
+  uuid: () =>
+    t.String({
+      format: "uuid",
+      error: "Invalid UUID format",
+    }),
+
+  /** URL */
+  url: () =>
+    t.String({
+      format: "uri",
+      error: "Invalid URL format",
+    }),
+
+  /** Slug (URL-safe string) */
+  slug: () =>
+    t.RegExp(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, {
+      error: "Invalid slug format",
+    }),
+
+  /** Phone number (basic pattern) */
+  phone: () =>
+    t.RegExp(/^\+?[1-9]\d{1,14}$/, {
+      error: "Invalid phone number",
+    }),
+
+  /** Alphanumeric string */
+  alphanumeric: (options?: { minLength?: number; maxLength?: number }) =>
+    t.RegExp(
+      new RegExp(
+        `^[a-zA-Z0-9]{${options?.minLength ?? 1},${options?.maxLength ?? ""}}$`
+      ),
+      { error: "Only letters and numbers allowed" }
+    ),
+};
+
+/**
+ * Custom number formats
+ */
+export const num = {
+  /** Positive integer */
+  positiveInt: () =>
+    t.Integer({
+      minimum: 1,
+      error: "Must be a positive integer",
+    }),
+
+  /** Non-negative integer */
+  nonNegativeInt: () =>
+    t.Integer({
+      minimum: 0,
+      error: "Must be a non-negative integer",
+    }),
+
+  /** Percentage (0-100) */
+  percentage: () =>
+    t.Number({
+      minimum: 0,
+      maximum: 100,
+      error: "Must be between 0 and 100",
+    }),
+
+  /** Port number */
+  port: () =>
+    t.Integer({
+      minimum: 1,
+      maximum: 65535,
+      error: "Invalid port number",
+    }),
+
+  /** Currency amount (2 decimal places) */
+  currency: () =>
+    t.Number({
+      multipleOf: 0.01,
+      minimum: 0,
+      error: "Invalid currency amount",
+    }),
+};
+
+/**
+ * Common object schemas
+ */
+export const schemas = {
+  /** Pagination query params */
+  pagination: t.Object({
+    page: t.Optional(t.Numeric({ minimum: 1, default: 1 })),
+    perPage: t.Optional(t.Numeric({ minimum: 1, maximum: 100, default: 20 })),
+  }),
+
+  /** Sort query params */
+  sort: t.Object({
+    sortBy: t.Optional(t.String()),
+    sortOrder: t.Optional(t.Union([t.Literal("asc"), t.Literal("desc")])),
+  }),
+
+  /** ID param */
+  idParam: t.Object({
+    id: str.uuid(),
+  }),
+
+  /** Timestamp fields */
+  timestamps: t.Object({
+    createdAt: t.String({ format: "date-time" }),
+    updatedAt: t.String({ format: "date-time" }),
+  }),
+
+  /** Base response */
+  baseResponse: <T extends ReturnType<typeof t.Object>>(data: T) =>
+    t.Object({
+      success: t.Boolean(),
+      data,
+    }),
+
+  /** Error response */
+  errorResponse: t.Object({
+    success: t.Literal(false),
+    error: t.Object({
+      code: t.String(),
+      message: t.String(),
+      details: t.Optional(t.Unknown()),
+    }),
+  }),
+};
+
+/**
+ * Schema composition helpers
+ */
+export const compose = {
+  /** Make all properties optional */
+  partial: <T extends ReturnType<typeof t.Object>>(schema: T) =>
+    t.Partial(schema),
+
+  /** Pick specific properties */
+  pick: <
+    T extends ReturnType<typeof t.Object>,
+    K extends keyof Static<T>
+  >(
+    schema: T,
+    keys: K[]
+  ) => t.Pick(schema, keys as string[]),
+
+  /** Omit specific properties */
+  omit: <
+    T extends ReturnType<typeof t.Object>,
+    K extends keyof Static<T>
+  >(
+    schema: T,
+    keys: K[]
+  ) => t.Omit(schema, keys as string[]),
+
+  /** Extend schema with additional properties */
+  extend: <
+    T extends ReturnType<typeof t.Object>,
+    E extends ReturnType<typeof t.Object>
+  >(
+    base: T,
+    extension: E
+  ) => t.Intersect([base, extension]),
+};
+
+/**
+ * Type inference helper
+ */
+export type Infer<T> = Static<T>;
+
+/* USAGE:
+
+import { Elysia, t } from "elysia";
+import { str, num, schemas, compose, Infer } from "./validation/typebox";
+
+// Define a user schema
+const UserSchema = t.Object({
+  id: str.uuid(),
+  email: str.email(),
+  name: str.required({ minLength: 2, maxLength: 100 }),
+  age: t.Optional(num.positiveInt()),
+  phone: t.Optional(str.phone()),
+});
+
+// Create variations
+const CreateUserSchema = compose.omit(UserSchema, ["id"]);
+const UpdateUserSchema = compose.partial(CreateUserSchema);
+
+// Type inference
+type User = Infer<typeof UserSchema>;
+type CreateUser = Infer<typeof CreateUserSchema>;
+
+const app = new Elysia()
+  .get("/users/:id", ({ params }) => {
+    // params.id is validated as UUID
+    return { user: { id: params.id } };
+  }, {
+    params: schemas.idParam,
+  })
+
+  .post("/users", ({ body }) => {
+    // body is typed as CreateUser
+    return { user: body };
+  }, {
+    body: CreateUserSchema,
+    response: {
+      200: schemas.baseResponse(UserSchema),
+      400: schemas.errorResponse,
+    },
+  })
+
+  .get("/users", ({ query }) => {
+    // query has pagination types
+    return { users: [], ...query };
+  }, {
+    query: t.Intersect([schemas.pagination, schemas.sort]),
+  })
+  .listen(3000);
+
+*/

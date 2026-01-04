@@ -1,0 +1,135 @@
+---
+name: elysia-logger
+description: HTTP request logging middleware with timing, structured output, and sensitive data masking
+dependencies: []
+devDependencies: []
+files:
+  - name: src/middleware/logger.ts
+---
+import { Elysia } from "elysia";
+
+export interface LoggerOptions {
+  /** Paths to exclude from logging */
+  excludePaths?: string[];
+  /** Whether to log request body (default: false in production) */
+  logBody?: boolean;
+  /** Whether to log query params */
+  logQuery?: boolean;
+  /** Max body length to log before truncating */
+  maxBodyLength?: number;
+}
+
+const SENSITIVE_FIELDS = [
+  "password",
+  "token",
+  "secret",
+  "apiKey",
+  "authorization",
+  "creditCard",
+  "ssn",
+];
+
+const sanitizeBody = (body: unknown, maxLength: number): unknown => {
+  if (typeof body !== "object" || body === null) return body;
+
+  const sanitized = { ...body } as Record<string, unknown>;
+
+  for (const field of Object.keys(sanitized)) {
+    const isFieldSensitive = SENSITIVE_FIELDS.some((f) =>
+      field.toLowerCase().includes(f.toLowerCase())
+    );
+    if (isFieldSensitive) {
+      sanitized[field] = "[REDACTED]";
+    }
+  }
+
+  const json = JSON.stringify(sanitized);
+  if (json.length > maxLength) {
+    return `[Body truncated: ${json.length} chars]`;
+  }
+
+  return sanitized;
+};
+
+const getClientIp = (request: Request): string => {
+  const forwarded = request.headers.get("x-forwarded-for");
+  if (forwarded) {
+    return forwarded.split(",")[0].trim();
+  }
+  return "unknown";
+};
+
+/**
+ * Logger middleware for Elysia
+ * Logs incoming requests and outgoing responses with timing information
+ */
+export const logger = (options: LoggerOptions = {}) => {
+  const isProd = process.env.NODE_ENV === "production";
+  const config = {
+    excludePaths: options.excludePaths ?? ["/health", "/metrics"],
+    logBody: options.logBody ?? !isProd,
+    logQuery: options.logQuery ?? true,
+    maxBodyLength: options.maxBodyLength ?? 1000,
+  };
+
+  return new Elysia({ name: "logger" })
+    .derive({ as: "global" }, () => ({
+      requestStartTime: Date.now(),
+    }))
+    .onRequest(({ request }) => {
+      const url = new URL(request.url);
+
+      if (config.excludePaths.some((path) => url.pathname.startsWith(path))) {
+        return;
+      }
+
+      const logData: Record<string, unknown> = {
+        method: request.method,
+        path: url.pathname,
+        ip: getClientIp(request),
+        userAgent: request.headers.get("user-agent"),
+      };
+
+      if (config.logQuery && url.search) {
+        logData.query = url.search;
+      }
+
+      console.log(`[REQ] ${request.method} ${url.pathname}`, logData);
+    })
+    .onAfterResponse(({ request, requestStartTime, set }) => {
+      const url = new URL(request.url);
+
+      if (config.excludePaths.some((path) => url.pathname.startsWith(path))) {
+        return;
+      }
+
+      const duration = Date.now() - requestStartTime;
+      const status = set.status ?? 200;
+      const statusIndicator = status < 400 ? "OK" : "ERR";
+
+      console.log(
+        `[RES] ${statusIndicator} ${request.method} ${url.pathname} ${status} ${duration}ms`
+      );
+    });
+};
+
+/* USAGE:
+
+import { Elysia } from "elysia";
+import { logger } from "./middleware/logger";
+
+const app = new Elysia()
+  .use(logger())
+  .get("/", () => "Hello World")
+  .listen(3000);
+
+// With options:
+const app = new Elysia()
+  .use(logger({
+    excludePaths: ["/health", "/metrics", "/favicon.ico"],
+    logBody: true,
+    logQuery: true,
+  }))
+  .listen(3000);
+
+*/

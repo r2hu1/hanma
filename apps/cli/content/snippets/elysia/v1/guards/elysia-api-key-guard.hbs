@@ -1,0 +1,172 @@
+---
+name: elysia-api-key-guard
+description: API key authentication guard with header-based validation and multiple key support
+dependencies: []
+devDependencies: []
+files:
+  - name: src/guards/api-key.ts
+---
+import { Elysia } from "elysia";
+
+export interface ApiKeyConfig {
+  /** Header name to read API key from (default: X-API-Key) */
+  headerName?: string;
+  /** Query parameter name as fallback (default: api_key) */
+  queryParam?: string;
+  /** Custom key validator (for database lookup) */
+  validator?: (key: string) => Promise<ApiKeyInfo | null> | ApiKeyInfo | null;
+}
+
+export interface ApiKeyInfo {
+  id: string;
+  name?: string;
+  permissions?: string[];
+  rateLimit?: number;
+}
+
+/**
+ * Parse API keys from environment variable
+ * Format: key1:name1,key2:name2 or just key1,key2
+ */
+const parseApiKeys = (): Map<string, ApiKeyInfo> => {
+  const keys = new Map<string, ApiKeyInfo>();
+  const envKeys = process.env.API_KEYS ?? "";
+
+  if (!envKeys) return keys;
+
+  envKeys.split(",").forEach((entry, index) => {
+    const [key, name] = entry.trim().split(":");
+    if (key) {
+      keys.set(key, {
+        id: `api-key-${index}`,
+        name: name ?? `Key ${index + 1}`,
+      });
+    }
+  });
+
+  return keys;
+};
+
+const apiKeys = parseApiKeys();
+
+/**
+ * Constant-time string comparison to prevent timing attacks
+ */
+const secureCompare = (a: string, b: string): boolean => {
+  if (a.length !== b.length) return false;
+
+  let result = 0;
+  for (let i = 0; i < a.length; i++) {
+    result |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  }
+  return result === 0;
+};
+
+/**
+ * API key authentication guard
+ */
+export const apiKeyGuard = (config: ApiKeyConfig = {}) => {
+  const headerName = config.headerName ?? "X-API-Key";
+  const queryParam = config.queryParam ?? "api_key";
+
+  const defaultValidator = (key: string): ApiKeyInfo | null => {
+    for (const [storedKey, info] of apiKeys.entries()) {
+      if (secureCompare(key, storedKey)) {
+        return info;
+      }
+    }
+    return null;
+  };
+
+  const validator = config.validator ?? defaultValidator;
+
+  return new Elysia({ name: "api-key-guard" })
+    .derive({ as: "scoped" }, async ({ request, set }) => {
+      // Try header first
+      let apiKey = request.headers.get(headerName);
+
+      // Fallback to query param
+      if (!apiKey) {
+        const url = new URL(request.url);
+        apiKey = url.searchParams.get(queryParam);
+      }
+
+      if (!apiKey) {
+        return { apiKeyInfo: null, hasValidApiKey: false };
+      }
+
+      const keyInfo = await validator(apiKey);
+
+      if (!keyInfo) {
+        return { apiKeyInfo: null, hasValidApiKey: false };
+      }
+
+      return { apiKeyInfo: keyInfo, hasValidApiKey: true };
+    });
+};
+
+/**
+ * Require valid API key - use with beforeHandle
+ */
+export const requireApiKey = ({ apiKeyInfo, hasValidApiKey, set }: {
+  apiKeyInfo: ApiKeyInfo | null;
+  hasValidApiKey: boolean;
+  set: { status: number };
+}) => {
+  if (!hasValidApiKey || !apiKeyInfo) {
+    set.status = 401;
+    return {
+      success: false,
+      error: {
+        code: "INVALID_API_KEY",
+        message: "Valid API key required",
+      },
+    };
+  }
+};
+
+/**
+ * Check if API key has specific permission
+ */
+export const hasPermission = (
+  apiKeyInfo: ApiKeyInfo | null,
+  permission: string
+): boolean => {
+  if (!apiKeyInfo?.permissions) return false;
+  return apiKeyInfo.permissions.includes(permission);
+};
+
+/* USAGE:
+
+import { Elysia } from "elysia";
+import { apiKeyGuard, requireApiKey, hasPermission } from "./guards/api-key";
+
+// Basic usage
+const app = new Elysia()
+  .use(apiKeyGuard())
+  .get("/api/data", ({ apiKeyInfo }) => {
+    return { data: [], keyName: apiKeyInfo?.name };
+  }, {
+    beforeHandle: [requireApiKey],
+  })
+  .listen(3000);
+
+// With custom validator (database lookup)
+const app = new Elysia()
+  .use(apiKeyGuard({
+    validator: async (key) => {
+      const result = await db.apiKeys.findUnique({ where: { key } });
+      if (!result) return null;
+      return {
+        id: result.id,
+        name: result.name,
+        permissions: result.permissions,
+      };
+    },
+  }))
+  .listen(3000);
+
+// Environment variable format:
+// API_KEYS=sk_live_abc123:Production,sk_test_xyz789:Development
+
+*/

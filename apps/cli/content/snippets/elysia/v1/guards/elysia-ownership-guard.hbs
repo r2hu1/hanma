@@ -1,0 +1,215 @@
+---
+name: elysia-ownership-guard
+description: Resource ownership validation guard for user-specific resource access
+dependencies: []
+devDependencies: []
+files:
+  - name: src/guards/ownership.ts
+---
+import { Elysia } from "elysia";
+
+/**
+ * User with ID for ownership comparison
+ */
+export interface OwnerUser {
+  id: string;
+  role?: string;
+}
+
+/**
+ * Resource with owner information
+ */
+export interface OwnedResource {
+  userId?: string;
+  ownerId?: string;
+  createdBy?: string;
+}
+
+export interface OwnershipConfig<T extends OwnedResource> {
+  /** Function to fetch the resource by ID */
+  getResource: (id: string) => Promise<T | null> | T | null;
+  /** Field on resource that contains owner ID (default: userId) */
+  ownerField?: keyof T;
+  /** Roles that bypass ownership check (default: ["admin", "superadmin"]) */
+  bypassRoles?: string[];
+  /** Parameter name containing resource ID (default: id) */
+  paramName?: string;
+}
+
+/**
+ * Get owner ID from resource
+ */
+const getOwnerId = <T extends OwnedResource>(
+  resource: T,
+  field: keyof T
+): string | null => {
+  const value = resource[field];
+  return typeof value === "string" ? value : null;
+};
+
+/**
+ * Create ownership guard for a specific resource type
+ */
+export const createOwnershipGuard = <T extends OwnedResource>(
+  config: OwnershipConfig<T>
+) => {
+  const ownerField = (config.ownerField ?? "userId") as keyof T;
+  const bypassRoles = config.bypassRoles ?? ["admin", "superadmin"];
+  const paramName = config.paramName ?? "id";
+
+  return new Elysia({ name: "ownership-guard" })
+    .derive({ as: "scoped" }, async ({ params }) => {
+      const resourceId = (params as Record<string, string>)[paramName];
+
+      if (!resourceId) {
+        return { resource: null, resourceExists: false };
+      }
+
+      const resource = await config.getResource(resourceId);
+
+      return {
+        resource,
+        resourceExists: resource !== null,
+      };
+    });
+};
+
+/**
+ * Require resource ownership - use with beforeHandle
+ */
+export const requireOwnership = <T extends OwnedResource>(
+  options: {
+    ownerField?: keyof T;
+    bypassRoles?: string[];
+  } = {}
+) => {
+  const ownerField = (options.ownerField ?? "userId") as keyof T;
+  const bypassRoles = options.bypassRoles ?? ["admin", "superadmin"];
+
+  return ({
+    user,
+    resource,
+    resourceExists,
+    set,
+  }: {
+    user: OwnerUser | null;
+    resource: T | null;
+    resourceExists: boolean;
+    set: { status: number };
+  }) => {
+    // Must be authenticated
+    if (!user) {
+      set.status = 401;
+      return {
+        success: false,
+        error: {
+          code: "UNAUTHORIZED",
+          message: "Authentication required",
+        },
+      };
+    }
+
+    // Resource must exist
+    if (!resourceExists || !resource) {
+      set.status = 404;
+      return {
+        success: false,
+        error: {
+          code: "NOT_FOUND",
+          message: "Resource not found",
+        },
+      };
+    }
+
+    // Check bypass roles
+    if (user.role && bypassRoles.includes(user.role)) {
+      return; // Allow access
+    }
+
+    // Check ownership
+    const ownerId = getOwnerId(resource, ownerField);
+
+    if (ownerId !== user.id) {
+      set.status = 403;
+      return {
+        success: false,
+        error: {
+          code: "FORBIDDEN",
+          message: "You do not have permission to access this resource",
+        },
+      };
+    }
+  };
+};
+
+/**
+ * Helper to check ownership without blocking
+ */
+export const isOwner = <T extends OwnedResource>(
+  user: OwnerUser | null,
+  resource: T | null,
+  ownerField: keyof T = "userId" as keyof T
+): boolean => {
+  if (!user || !resource) return false;
+  const ownerId = getOwnerId(resource, ownerField);
+  return ownerId === user.id;
+};
+
+/* USAGE:
+
+import { Elysia, t } from "elysia";
+import { authGuard, requireAuth } from "./guards/auth";
+import { createOwnershipGuard, requireOwnership } from "./guards/ownership";
+
+// Example: Post resource
+interface Post {
+  id: string;
+  userId: string;
+  title: string;
+  content: string;
+}
+
+// Mock database
+const posts = new Map<string, Post>();
+
+// Create ownership guard for posts
+const postOwnershipGuard = createOwnershipGuard<Post>({
+  getResource: (id) => posts.get(id) ?? null,
+  ownerField: "userId",
+  paramName: "id",
+});
+
+const app = new Elysia()
+  .use(authGuard)
+
+  // Get post (public)
+  .get("/posts/:id", ({ params }) => {
+    return posts.get(params.id) ?? null;
+  })
+
+  // Update post (owner only)
+  .use(postOwnershipGuard)
+  .put("/posts/:id", ({ resource, body }) => {
+    // resource is typed as Post
+    return { ...resource, ...body };
+  }, {
+    beforeHandle: [requireAuth, requireOwnership<Post>()],
+    body: t.Object({
+      title: t.Optional(t.String()),
+      content: t.Optional(t.String()),
+    }),
+  })
+
+  // Delete post (owner or admin)
+  .delete("/posts/:id", ({ resource }) => {
+    posts.delete(resource!.id);
+    return { deleted: true };
+  }, {
+    beforeHandle: [
+      requireAuth,
+      requireOwnership<Post>({ bypassRoles: ["admin"] }),
+    ],
+  })
+  .listen(3000);
+
+*/
