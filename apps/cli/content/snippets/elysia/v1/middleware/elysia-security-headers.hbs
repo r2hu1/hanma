@@ -1,0 +1,146 @@
+---
+name: elysia-security-headers
+description: Security headers middleware with CSP, HSTS, and other protections
+dependencies: []
+devDependencies: []
+files:
+  - name: src/middleware/security-headers.ts
+---
+import { Elysia } from "elysia";
+
+export interface SecurityHeadersOptions {
+  /** Content Security Policy directives */
+  contentSecurityPolicy?: Record<string, string | string[]> | false;
+  /** X-Content-Type-Options (default: nosniff) */
+  contentTypeOptions?: string | false;
+  /** X-Frame-Options (default: DENY) */
+  frameOptions?: "DENY" | "SAMEORIGIN" | false;
+  /** Strict-Transport-Security options */
+  hsts?: {
+    maxAge?: number;
+    includeSubDomains?: boolean;
+    preload?: boolean;
+  } | false;
+  /** X-XSS-Protection (default: 0, as it's deprecated) */
+  xssProtection?: string | false;
+  /** Referrer-Policy (default: strict-origin-when-cross-origin) */
+  referrerPolicy?: string | false;
+  /** Permissions-Policy directives */
+  permissionsPolicy?: Record<string, string[]> | false;
+}
+
+const buildCsp = (directives: Record<string, string | string[]>): string => {
+  return Object.entries(directives)
+    .map(([key, value]) => {
+      const values = Array.isArray(value) ? value.join(" ") : value;
+      return `${key} ${values}`;
+    })
+    .join("; ");
+};
+
+const buildPermissionsPolicy = (directives: Record<string, string[]>): string => {
+  return Object.entries(directives)
+    .map(([key, value]) => `${key}=(${value.join(" ")})`)
+    .join(", ");
+};
+
+/**
+ * Security headers middleware for Elysia
+ * Adds common security headers to all responses
+ */
+export const securityHeaders = (options: SecurityHeadersOptions = {}) => {
+  const isProd = process.env.NODE_ENV === "production";
+
+  const config = {
+    contentSecurityPolicy: options.contentSecurityPolicy ?? {
+      "default-src": "'self'",
+      "script-src": ["'self'", isProd ? "" : "'unsafe-inline'"].filter(Boolean),
+      "style-src": ["'self'", "'unsafe-inline'"],
+      "img-src": ["'self'", "data:", "https:"],
+      "font-src": ["'self'"],
+      "connect-src": ["'self'"],
+      "frame-ancestors": "'none'",
+    },
+    contentTypeOptions: options.contentTypeOptions ?? "nosniff",
+    frameOptions: options.frameOptions ?? "DENY",
+    hsts: options.hsts ?? (isProd ? { maxAge: 31536000, includeSubDomains: true } : false),
+    xssProtection: options.xssProtection ?? "0",
+    referrerPolicy: options.referrerPolicy ?? "strict-origin-when-cross-origin",
+    permissionsPolicy: options.permissionsPolicy ?? {
+      camera: [],
+      microphone: [],
+      geolocation: [],
+    },
+  };
+
+  return new Elysia({ name: "security-headers" })
+    .onAfterHandle(({ set }) => {
+      // Content-Security-Policy
+      if (config.contentSecurityPolicy !== false) {
+        set.headers["Content-Security-Policy"] = buildCsp(config.contentSecurityPolicy);
+      }
+
+      // X-Content-Type-Options
+      if (config.contentTypeOptions !== false) {
+        set.headers["X-Content-Type-Options"] = config.contentTypeOptions;
+      }
+
+      // X-Frame-Options
+      if (config.frameOptions !== false) {
+        set.headers["X-Frame-Options"] = config.frameOptions;
+      }
+
+      // Strict-Transport-Security
+      if (config.hsts !== false) {
+        let hstsValue = `max-age=${config.hsts.maxAge ?? 31536000}`;
+        if (config.hsts.includeSubDomains) hstsValue += "; includeSubDomains";
+        if (config.hsts.preload) hstsValue += "; preload";
+        set.headers["Strict-Transport-Security"] = hstsValue;
+      }
+
+      // X-XSS-Protection (deprecated but still used)
+      if (config.xssProtection !== false) {
+        set.headers["X-XSS-Protection"] = config.xssProtection;
+      }
+
+      // Referrer-Policy
+      if (config.referrerPolicy !== false) {
+        set.headers["Referrer-Policy"] = config.referrerPolicy;
+      }
+
+      // Permissions-Policy
+      if (config.permissionsPolicy !== false) {
+        set.headers["Permissions-Policy"] = buildPermissionsPolicy(config.permissionsPolicy);
+      }
+    });
+};
+
+/* USAGE:
+
+import { Elysia } from "elysia";
+import { securityHeaders } from "./middleware/security-headers";
+
+// Basic usage with defaults
+const app = new Elysia()
+  .use(securityHeaders())
+  .get("/", () => "Hello World")
+  .listen(3000);
+
+// With custom options
+const app = new Elysia()
+  .use(securityHeaders({
+    frameOptions: "SAMEORIGIN",
+    hsts: {
+      maxAge: 63072000, // 2 years
+      includeSubDomains: true,
+      preload: true,
+    },
+    contentSecurityPolicy: {
+      "default-src": "'self'",
+      "script-src": ["'self'", "https://cdn.example.com"],
+      "img-src": ["'self'", "https:", "data:"],
+    },
+  }))
+  .listen(3000);
+
+*/

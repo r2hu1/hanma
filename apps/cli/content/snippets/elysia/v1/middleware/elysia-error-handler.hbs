@@ -1,0 +1,218 @@
+---
+name: elysia-error-handler
+description: Centralized error handling with custom error classes and consistent JSON responses
+dependencies: []
+devDependencies: []
+files:
+  - name: src/middleware/error-handler.ts
+---
+import { Elysia } from "elysia";
+
+/**
+ * Base HTTP error class
+ */
+export class HttpError extends Error {
+  constructor(
+    public readonly statusCode: number,
+    message: string,
+    public readonly code?: string,
+    public readonly details?: unknown
+  ) {
+    super(message);
+    this.name = this.constructor.name;
+  }
+}
+
+/**
+ * 400 Bad Request
+ */
+export class BadRequestError extends HttpError {
+  constructor(message = "Bad Request", details?: unknown) {
+    super(400, message, "BAD_REQUEST", details);
+  }
+}
+
+/**
+ * 401 Unauthorized
+ */
+export class UnauthorizedError extends HttpError {
+  constructor(message = "Unauthorized") {
+    super(401, message, "UNAUTHORIZED");
+  }
+}
+
+/**
+ * 403 Forbidden
+ */
+export class ForbiddenError extends HttpError {
+  constructor(message = "Forbidden") {
+    super(403, message, "FORBIDDEN");
+  }
+}
+
+/**
+ * 404 Not Found
+ */
+export class NotFoundError extends HttpError {
+  constructor(message = "Not Found") {
+    super(404, message, "NOT_FOUND");
+  }
+}
+
+/**
+ * 409 Conflict
+ */
+export class ConflictError extends HttpError {
+  constructor(message = "Conflict", details?: unknown) {
+    super(409, message, "CONFLICT", details);
+  }
+}
+
+/**
+ * 422 Unprocessable Entity
+ */
+export class ValidationError extends HttpError {
+  constructor(message = "Validation Failed", details?: unknown) {
+    super(422, message, "VALIDATION_ERROR", details);
+  }
+}
+
+/**
+ * 429 Too Many Requests
+ */
+export class TooManyRequestsError extends HttpError {
+  constructor(message = "Too Many Requests", public readonly retryAfter?: number) {
+    super(429, message, "TOO_MANY_REQUESTS");
+  }
+}
+
+/**
+ * 500 Internal Server Error
+ */
+export class InternalServerError extends HttpError {
+  constructor(message = "Internal Server Error") {
+    super(500, message, "INTERNAL_SERVER_ERROR");
+  }
+}
+
+export interface ErrorResponse {
+  success: false;
+  error: {
+    code: string;
+    message: string;
+    details?: unknown;
+  };
+  timestamp: string;
+  requestId?: string;
+}
+
+/**
+ * Error handler middleware for Elysia
+ * Provides consistent error responses and logging
+ */
+export const errorHandler = () => {
+  const isProd = process.env.NODE_ENV === "production";
+
+  return new Elysia({ name: "error-handler" })
+    .error({
+      HttpError,
+      BadRequestError,
+      UnauthorizedError,
+      ForbiddenError,
+      NotFoundError,
+      ConflictError,
+      ValidationError,
+      TooManyRequestsError,
+      InternalServerError,
+    })
+    .onError(({ code, error, set, request }) => {
+      let statusCode = 500;
+      let errorCode = "INTERNAL_SERVER_ERROR";
+      let message = "An unexpected error occurred";
+      let details: unknown = undefined;
+
+      // Handle custom HTTP errors
+      if (error instanceof HttpError) {
+        statusCode = error.statusCode;
+        errorCode = error.code ?? code;
+        message = error.message;
+        details = error.details;
+      }
+      // Handle Elysia validation errors
+      else if (code === "VALIDATION") {
+        statusCode = 400;
+        errorCode = "VALIDATION_ERROR";
+        message = error.message;
+        details = isProd ? undefined : (error as any).all;
+      }
+      // Handle not found
+      else if (code === "NOT_FOUND") {
+        statusCode = 404;
+        errorCode = "NOT_FOUND";
+        message = "Resource not found";
+      }
+      // Handle parse errors
+      else if (code === "PARSE") {
+        statusCode = 400;
+        errorCode = "PARSE_ERROR";
+        message = "Invalid request body";
+      }
+
+      // Log errors
+      if (statusCode >= 500) {
+        console.error(`[ERROR] ${request.method} ${request.url}`, {
+          code: errorCode,
+          message: error.message,
+          stack: error.stack,
+        });
+      } else if (!isProd) {
+        console.warn(`[WARN] ${request.method} ${request.url}`, {
+          code: errorCode,
+          message,
+        });
+      }
+
+      set.status = statusCode;
+
+      const response: ErrorResponse = {
+        success: false,
+        error: {
+          code: errorCode,
+          message: isProd && statusCode === 500 ? "Internal Server Error" : message,
+          details: isProd ? undefined : details,
+        },
+        timestamp: new Date().toISOString(),
+      };
+
+      return response;
+    });
+};
+
+/* USAGE:
+
+import { Elysia } from "elysia";
+import { 
+  errorHandler, 
+  NotFoundError, 
+  BadRequestError,
+  UnauthorizedError 
+} from "./middleware/error-handler";
+
+const app = new Elysia()
+  .use(errorHandler())
+  .get("/users/:id", ({ params }) => {
+    const user = findUser(params.id);
+    if (!user) {
+      throw new NotFoundError("User not found");
+    }
+    return user;
+  })
+  .post("/login", ({ body }) => {
+    if (!body.email || !body.password) {
+      throw new BadRequestError("Email and password required");
+    }
+    // ...
+  })
+  .listen(3000);
+
+*/

@@ -1,0 +1,89 @@
+---
+name: elysia-request-id
+description: Request ID tracing middleware for distributed systems and logging correlation
+dependencies: []
+devDependencies: []
+files:
+  - name: src/middleware/request-id.ts
+---
+import { Elysia } from "elysia";
+
+export interface RequestIdOptions {
+  /** Header name to read/write request ID (default: X-Request-ID) */
+  headerName?: string;
+  /** Custom ID generator (default: crypto.randomUUID) */
+  generator?: () => string;
+  /** Whether to set response header (default: true) */
+  setResponseHeader?: boolean;
+}
+
+/**
+ * Request ID middleware for Elysia
+ * Generates or propagates request IDs for tracing and logging correlation
+ */
+export const requestId = (options: RequestIdOptions = {}) => {
+  const config = {
+    headerName: options.headerName ?? "X-Request-ID",
+    generator: options.generator ?? (() => crypto.randomUUID()),
+    setResponseHeader: options.setResponseHeader ?? true,
+  };
+
+  return new Elysia({ name: "request-id" })
+    .derive({ as: "global" }, ({ request }) => {
+      // Use existing request ID from header or generate new one
+      const existingId = request.headers.get(config.headerName);
+      const requestId = existingId || config.generator();
+
+      return { requestId };
+    })
+    .onAfterHandle(({ requestId, set }) => {
+      if (config.setResponseHeader) {
+        set.headers[config.headerName] = requestId;
+      }
+    });
+};
+
+/**
+ * Helper to create a logger that includes request ID
+ */
+export const createRequestLogger = (requestId: string) => ({
+  info: (message: string, data?: Record<string, unknown>) => {
+    console.log(JSON.stringify({ level: "info", requestId, message, ...data }));
+  },
+  warn: (message: string, data?: Record<string, unknown>) => {
+    console.warn(JSON.stringify({ level: "warn", requestId, message, ...data }));
+  },
+  error: (message: string, data?: Record<string, unknown>) => {
+    console.error(JSON.stringify({ level: "error", requestId, message, ...data }));
+  },
+  debug: (message: string, data?: Record<string, unknown>) => {
+    if (process.env.NODE_ENV !== "production") {
+      console.debug(JSON.stringify({ level: "debug", requestId, message, ...data }));
+    }
+  },
+});
+
+/* USAGE:
+
+import { Elysia } from "elysia";
+import { requestId, createRequestLogger } from "./middleware/request-id";
+
+const app = new Elysia()
+  .use(requestId())
+  .get("/", ({ requestId }) => {
+    const log = createRequestLogger(requestId);
+    log.info("Processing request");
+    
+    return { message: "Hello", requestId };
+  })
+  .listen(3000);
+
+// With custom options
+const app = new Elysia()
+  .use(requestId({
+    headerName: "X-Correlation-ID",
+    generator: () => `req_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
+  }))
+  .listen(3000);
+
+*/

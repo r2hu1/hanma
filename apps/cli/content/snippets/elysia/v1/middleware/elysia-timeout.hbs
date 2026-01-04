@@ -1,0 +1,108 @@
+---
+name: elysia-timeout
+description: Request timeout middleware with configurable duration and cleanup
+dependencies: []
+devDependencies: []
+files:
+  - name: src/middleware/timeout.ts
+---
+import { Elysia } from "elysia";
+
+export interface TimeoutOptions {
+  /** Timeout duration in milliseconds (default: 30000 = 30 seconds) */
+  duration?: number;
+  /** Custom timeout message */
+  message?: string;
+  /** Paths to exclude from timeout */
+  excludePaths?: string[];
+}
+
+/**
+ * Request timeout middleware for Elysia
+ * Aborts requests that exceed the specified duration
+ */
+export const timeout = (options: TimeoutOptions = {}) => {
+  const config = {
+    duration: options.duration ?? Number(process.env.REQUEST_TIMEOUT_MS) || 30000,
+    message: options.message ?? "Request timeout",
+    excludePaths: options.excludePaths ?? [],
+  };
+
+  return new Elysia({ name: "timeout" })
+    .derive({ as: "global" }, ({ request }) => {
+      const url = new URL(request.url);
+      const isExcluded = config.excludePaths.some((path) =>
+        url.pathname.startsWith(path)
+      );
+
+      if (isExcluded) {
+        return { timeoutController: null };
+      }
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => {
+        controller.abort();
+      }, config.duration);
+
+      return {
+        timeoutController: controller,
+        timeoutId,
+      };
+    })
+    .onBeforeHandle(({ timeoutController, set }) => {
+      if (timeoutController?.signal.aborted) {
+        set.status = 408;
+        return {
+          success: false,
+          error: {
+            code: "REQUEST_TIMEOUT",
+            message: config.message,
+          },
+        };
+      }
+    })
+    .onAfterResponse(({ timeoutId }) => {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+    });
+};
+
+/**
+ * Helper to check if request is still within timeout
+ */
+export const checkTimeout = (controller: AbortController | null): boolean => {
+  return controller?.signal.aborted ?? false;
+};
+
+/* USAGE:
+
+import { Elysia } from "elysia";
+import { timeout, checkTimeout } from "./middleware/timeout";
+
+const app = new Elysia()
+  .use(timeout({ duration: 5000 })) // 5 second timeout
+  .get("/slow", async ({ timeoutController }) => {
+    // Long running operation
+    for (let i = 0; i < 10; i++) {
+      if (checkTimeout(timeoutController)) {
+        throw new Error("Operation cancelled due to timeout");
+      }
+      await Bun.sleep(1000);
+    }
+    return { result: "done" };
+  })
+  .listen(3000);
+
+// With exclusions for streaming/long-polling endpoints
+const app = new Elysia()
+  .use(timeout({
+    duration: 30000,
+    excludePaths: ["/stream", "/ws", "/long-poll"],
+  }))
+  .listen(3000);
+
+// Environment variable:
+// REQUEST_TIMEOUT_MS=30000
+
+*/

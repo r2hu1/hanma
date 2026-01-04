@@ -1,0 +1,142 @@
+---
+name: elysia-rate-limiter
+description: In-memory rate limiting middleware with sliding window algorithm and configurable limits
+dependencies: []
+devDependencies: []
+files:
+  - name: src/middleware/rate-limiter.ts
+---
+import { Elysia } from "elysia";
+
+export interface RateLimitOptions {
+  /** Time window in milliseconds (default: 60000 = 1 minute) */
+  windowMs?: number;
+  /** Maximum requests per window (default: 100) */
+  max?: number;
+  /** Custom key generator (default: uses IP address) */
+  keyGenerator?: (request: Request) => string;
+  /** Skip rate limiting for certain requests */
+  skip?: (request: Request) => boolean;
+  /** Custom message when rate limit exceeded */
+  message?: string;
+}
+
+interface RateLimitEntry {
+  count: number;
+  resetTime: number;
+}
+
+const store = new Map<string, RateLimitEntry>();
+
+// Cleanup old entries periodically
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, entry] of store.entries()) {
+    if (entry.resetTime < now) {
+      store.delete(key);
+    }
+  }
+}, 60000);
+
+const getClientIp = (request: Request): string => {
+  const forwarded = request.headers.get("x-forwarded-for");
+  if (forwarded) {
+    return forwarded.split(",")[0].trim();
+  }
+  return "127.0.0.1";
+};
+
+/**
+ * Rate limiting middleware for Elysia
+ * Uses in-memory sliding window algorithm
+ */
+export const rateLimiter = (options: RateLimitOptions = {}) => {
+  const config = {
+    windowMs: options.windowMs ?? Number(process.env.RATE_LIMIT_WINDOW_MS) || 60000,
+    max: options.max ?? Number(process.env.RATE_LIMIT_MAX) || 100,
+    keyGenerator: options.keyGenerator ?? getClientIp,
+    skip: options.skip,
+    message: options.message ?? "Too many requests, please try again later",
+  };
+
+  return new Elysia({ name: "rate-limiter" })
+    .derive({ as: "global" }, ({ request }) => {
+      const key = config.keyGenerator(request);
+      const now = Date.now();
+      let entry = store.get(key);
+
+      if (!entry || entry.resetTime < now) {
+        entry = {
+          count: 0,
+          resetTime: now + config.windowMs,
+        };
+        store.set(key, entry);
+      }
+
+      return {
+        rateLimitKey: key,
+        rateLimitEntry: entry,
+        rateLimitConfig: config,
+      };
+    })
+    .onBeforeHandle(({ request, rateLimitEntry, rateLimitConfig, set }) => {
+      // Check if should skip
+      if (rateLimitConfig.skip?.(request)) {
+        return;
+      }
+
+      const now = Date.now();
+
+      // Increment count
+      rateLimitEntry.count++;
+
+      // Set rate limit headers
+      const remaining = Math.max(0, rateLimitConfig.max - rateLimitEntry.count);
+      const resetSeconds = Math.ceil((rateLimitEntry.resetTime - now) / 1000);
+
+      set.headers["X-RateLimit-Limit"] = String(rateLimitConfig.max);
+      set.headers["X-RateLimit-Remaining"] = String(remaining);
+      set.headers["X-RateLimit-Reset"] = String(resetSeconds);
+
+      // Check if exceeded
+      if (rateLimitEntry.count > rateLimitConfig.max) {
+        set.status = 429;
+        set.headers["Retry-After"] = String(resetSeconds);
+
+        return {
+          success: false,
+          message: rateLimitConfig.message,
+          retryAfter: resetSeconds,
+        };
+      }
+    });
+};
+
+/* USAGE:
+
+import { Elysia } from "elysia";
+import { rateLimiter } from "./middleware/rate-limiter";
+
+// Basic usage
+const app = new Elysia()
+  .use(rateLimiter())
+  .get("/", () => "Hello World")
+  .listen(3000);
+
+// With custom options
+const app = new Elysia()
+  .use(rateLimiter({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 100, // 100 requests per window
+    skip: (request) => {
+      const url = new URL(request.url);
+      return url.pathname === "/health";
+    },
+  }))
+  .listen(3000);
+
+// Environment variables:
+// RATE_LIMIT_WINDOW_MS=60000
+// RATE_LIMIT_MAX=100
+
+*/
