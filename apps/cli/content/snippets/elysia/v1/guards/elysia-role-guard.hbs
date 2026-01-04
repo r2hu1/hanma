@@ -1,0 +1,204 @@
+---
+name: elysia-role-guard
+description: Role-based access control guard for authorization with flexible role checking
+dependencies: []
+devDependencies: []
+files:
+  - name: src/guards/role.ts
+---
+import { Elysia } from "elysia";
+
+/**
+ * User with role information
+ */
+export interface RoleUser {
+  id: string;
+  role?: string;
+  roles?: string[];
+}
+
+/**
+ * Role hierarchy - higher roles inherit permissions of lower roles
+ */
+const DEFAULT_ROLE_HIERARCHY: Record<string, number> = {
+  guest: 0,
+  user: 1,
+  moderator: 2,
+  admin: 3,
+  superadmin: 4,
+};
+
+export interface RoleGuardOptions {
+  /** Custom role hierarchy (higher number = more permissions) */
+  hierarchy?: Record<string, number>;
+  /** Property name to read roles from user object */
+  rolesProperty?: "role" | "roles";
+}
+
+/**
+ * Create a role checker function
+ */
+export const createRoleChecker = (options: RoleGuardOptions = {}) => {
+  const hierarchy = options.hierarchy ?? DEFAULT_ROLE_HIERARCHY;
+  const rolesProperty = options.rolesProperty ?? "role";
+
+  /**
+   * Get user's roles as an array
+   */
+  const getUserRoles = (user: RoleUser | null): string[] => {
+    if (!user) return [];
+
+    if (rolesProperty === "roles" && Array.isArray(user.roles)) {
+      return user.roles;
+    }
+
+    if (user.role) {
+      return [user.role];
+    }
+
+    return [];
+  };
+
+  /**
+   * Get the highest role level for a user
+   */
+  const getUserLevel = (user: RoleUser | null): number => {
+    const roles = getUserRoles(user);
+    return Math.max(0, ...roles.map((r) => hierarchy[r] ?? 0));
+  };
+
+  /**
+   * Check if user has any of the specified roles
+   */
+  const hasAnyRole = (user: RoleUser | null, allowedRoles: string[]): boolean => {
+    const userRoles = getUserRoles(user);
+    return allowedRoles.some((role) => userRoles.includes(role));
+  };
+
+  /**
+   * Check if user has all of the specified roles
+   */
+  const hasAllRoles = (user: RoleUser | null, requiredRoles: string[]): boolean => {
+    const userRoles = getUserRoles(user);
+    return requiredRoles.every((role) => userRoles.includes(role));
+  };
+
+  /**
+   * Check if user has minimum role level
+   */
+  const hasMinRole = (user: RoleUser | null, minRole: string): boolean => {
+    const userLevel = getUserLevel(user);
+    const requiredLevel = hierarchy[minRole] ?? 0;
+    return userLevel >= requiredLevel;
+  };
+
+  return { getUserRoles, getUserLevel, hasAnyRole, hasAllRoles, hasMinRole };
+};
+
+/**
+ * Require any of the specified roles - use with beforeHandle
+ */
+export const requireRoles = (allowedRoles: string[], options: RoleGuardOptions = {}) => {
+  const { hasAnyRole } = createRoleChecker(options);
+
+  return ({ user, set }: { user: RoleUser | null; set: { status: number } }) => {
+    if (!user) {
+      set.status = 401;
+      return {
+        success: false,
+        error: {
+          code: "UNAUTHORIZED",
+          message: "Authentication required",
+        },
+      };
+    }
+
+    if (!hasAnyRole(user, allowedRoles)) {
+      set.status = 403;
+      return {
+        success: false,
+        error: {
+          code: "FORBIDDEN",
+          message: "Insufficient permissions",
+          required: allowedRoles,
+        },
+      };
+    }
+  };
+};
+
+/**
+ * Require minimum role level - use with beforeHandle
+ */
+export const requireMinRole = (minRole: string, options: RoleGuardOptions = {}) => {
+  const { hasMinRole } = createRoleChecker(options);
+
+  return ({ user, set }: { user: RoleUser | null; set: { status: number } }) => {
+    if (!user) {
+      set.status = 401;
+      return {
+        success: false,
+        error: {
+          code: "UNAUTHORIZED",
+          message: "Authentication required",
+        },
+      };
+    }
+
+    if (!hasMinRole(user, minRole)) {
+      set.status = 403;
+      return {
+        success: false,
+        error: {
+          code: "FORBIDDEN",
+          message: `Minimum role required: ${minRole}`,
+        },
+      };
+    }
+  };
+};
+
+/* USAGE:
+
+import { Elysia } from "elysia";
+import { authGuard, requireAuth } from "./guards/auth";
+import { requireRoles, requireMinRole } from "./guards/role";
+
+const app = new Elysia()
+  .use(authGuard)
+
+  // Admin only route
+  .get("/admin/users", ({ user }) => {
+    return { users: [] };
+  }, {
+    beforeHandle: [requireAuth, requireRoles(["admin", "superadmin"])],
+  })
+
+  // Moderator or higher
+  .delete("/posts/:id", ({ params }) => {
+    return { deleted: params.id };
+  }, {
+    beforeHandle: [requireAuth, requireMinRole("moderator")],
+  })
+
+  // Multiple roles required
+  .guard({
+    beforeHandle: [requireAuth, requireRoles(["admin"])],
+  }, (app) =>
+    app
+      .get("/admin/settings", () => ({ settings: {} }))
+      .put("/admin/settings", () => ({ updated: true }))
+  )
+  .listen(3000);
+
+// Custom role hierarchy
+const checkRole = requireRoles(["editor"], {
+  hierarchy: {
+    viewer: 1,
+    editor: 2,
+    publisher: 3,
+    admin: 4,
+  },
+});
+
+*/

@@ -1,0 +1,146 @@
+---
+name: elysia-auth-guard
+description: JWT authentication guard with type-safe user context injection
+dependencies:
+  - "@elysiajs/jwt"
+devDependencies: []
+files:
+  - name: src/guards/auth.ts
+---
+import { Elysia, t } from "elysia";
+import { jwt } from "@elysiajs/jwt";
+
+/**
+ * JWT payload interface - customize based on your needs
+ */
+export interface JwtPayload {
+  sub: string;
+  email: string;
+  role?: string;
+  iat?: number;
+  exp?: number;
+}
+
+/**
+ * User context after authentication
+ */
+export interface AuthUser {
+  id: string;
+  email: string;
+  role?: string;
+}
+
+/**
+ * JWT configuration
+ */
+const jwtConfig = {
+  name: "jwt",
+  secret: process.env.JWT_SECRET ?? "change-this-secret-in-production",
+  exp: process.env.JWT_EXPIRES_IN ?? "7d",
+} as const;
+
+/**
+ * Auth guard plugin with JWT validation
+ * Provides type-safe user context via derive
+ */
+export const authGuard = new Elysia({ name: "auth-guard" })
+  .use(jwt(jwtConfig))
+  .derive({ as: "scoped" }, async ({ jwt, request, set }) => {
+    const authHeader = request.headers.get("authorization");
+
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return { user: null, isAuthenticated: false };
+    }
+
+    const token = authHeader.slice(7);
+
+    try {
+      const payload = await jwt.verify(token) as JwtPayload | false;
+
+      if (!payload) {
+        return { user: null, isAuthenticated: false };
+      }
+
+      const user: AuthUser = {
+        id: payload.sub,
+        email: payload.email,
+        role: payload.role,
+      };
+
+      return { user, isAuthenticated: true };
+    } catch {
+      return { user: null, isAuthenticated: false };
+    }
+  });
+
+/**
+ * Require authentication - use with beforeHandle
+ */
+export const requireAuth = ({ user, isAuthenticated, set }: {
+  user: AuthUser | null;
+  isAuthenticated: boolean;
+  set: { status: number };
+}) => {
+  if (!isAuthenticated || !user) {
+    set.status = 401;
+    return {
+      success: false,
+      error: {
+        code: "UNAUTHORIZED",
+        message: "Authentication required",
+      },
+    };
+  }
+};
+
+/**
+ * Optional authentication - populates user if token present but doesn't require it
+ */
+export const optionalAuth = new Elysia({ name: "optional-auth" })
+  .use(authGuard);
+
+/* USAGE:
+
+import { Elysia, t } from "elysia";
+import { authGuard, requireAuth } from "./guards/auth";
+
+const app = new Elysia()
+  // Public route
+  .get("/", () => ({ message: "Public" }))
+  
+  // Protected route with guard
+  .use(authGuard)
+  .get("/profile", ({ user }) => {
+    return { user };
+  }, {
+    beforeHandle: [requireAuth],
+  })
+
+  // Generate JWT token (for login)
+  .post("/login", async ({ jwt, body }) => {
+    // Validate credentials...
+    const token = await jwt.sign({
+      sub: "user-123",
+      email: body.email,
+      role: "user",
+    });
+    
+    return { token };
+  }, {
+    body: t.Object({
+      email: t.String(),
+      password: t.String(),
+    }),
+  })
+  .listen(3000);
+
+// Grouped protected routes
+const protectedRoutes = new Elysia()
+  .use(authGuard)
+  .guard({ beforeHandle: [requireAuth] }, (app) =>
+    app
+      .get("/me", ({ user }) => ({ user }))
+      .get("/settings", ({ user }) => ({ settings: {} }))
+  );
+
+*/
