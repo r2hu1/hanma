@@ -9,6 +9,7 @@ import {
   tooling,
   addons,
   help,
+  update,
 } from "./commands";
 import { VERSION } from "./constants";
 
@@ -26,6 +27,7 @@ program.addCommand(module);
 program.addCommand(show);
 program.addCommand(tooling);
 program.addCommand(addons);
+program.addCommand(update);
 program.addCommand(help);
 
 program.parse();

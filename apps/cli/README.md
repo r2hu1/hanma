@@ -71,8 +71,10 @@ The entry point for new projects.
 | `--framework <fw>` | Force a specific framework (e.g., `express`, `hono`, `elysia`) |
 | `--database <db>` | Pre-select database (e.g., `drizzle-postgres`, `prisma-mysql`) |
 | `--auth <auth>` | Pre-select auth provider (e.g., `better-auth`, `clerk`, `jwt`) |
-| `--pm <package-manager>` | Default to `pnpm`, `npm`, `yarn`, or `bun` |
+| `--pm <package-manager>` | Select package manager (only shows installed ones) |
 | `--skip-install` | Scaffold only, don't run the installer |
+
+> **Note:** The CLI automatically detects which package managers are installed on your system and only shows those as options.
 
 ### `add [snippets...]`
 
@@ -94,6 +96,18 @@ The Discovery Engine. Browse the registry without leaving your terminal.
 - `hanma show templates`: Browse the scaffolding library.
 - `hanma show modules`: See complex multi-file features.
 - `hanma show tooling`: Browse dev-tools configurations.
+
+### `update`
+
+Keep your CLI up to date.
+
+```bash
+# Check for updates
+hanma update --check
+
+# Update to latest version
+hanma update
+```
 
 ---
 
