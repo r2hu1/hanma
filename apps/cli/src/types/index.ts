@@ -1,11 +1,12 @@
 /**
  * CLI Types
  *
- * Re-exports Zod schemas and CLI-specific types
+ * Re-exports Zod schemas from @repo/schemas (bundled at build time)
+ * and CLI-specific types
  */
 
-// Export inlined schemas (no external @repo/schemas dependency)
-export * from "./schemas";
+// Export schemas from shared package (bundled into dist by tsup)
+export * from "@repo/schemas";
 
 // CLI-specific types
 export * from "./template";

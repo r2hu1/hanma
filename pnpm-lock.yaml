@@ -60,6 +60,9 @@ importers:
       '@repo/eslint-config':
         specifier: workspace:^
         version: link:../../packages/eslint-config
+      '@repo/schemas':
+        specifier: workspace:*
+        version: link:../../packages/schemas
       '@repo/typescript-config':
         specifier: workspace:*
         version: link:../../packages/typescript-config

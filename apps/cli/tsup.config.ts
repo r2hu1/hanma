@@ -7,4 +7,5 @@ export default defineConfig({
   clean: true,
   sourcemap: true,
   minify: true,
+  noExternal: ["@repo/schemas"], // Bundle this workspace package into dist
 });

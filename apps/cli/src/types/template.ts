@@ -2,10 +2,10 @@
  * CLI-specific template types
  */
 
-import type { TemplateFile, TemplateBlock, ModuleBlock } from "./schemas";
+import type { TemplateFile, TemplateBlock, ModuleBlock } from "@repo/schemas";
 
 // Re-export shared types for convenience
-export type { TemplateFile, TemplateBlock, ModuleBlock } from "./schemas";
+export type { TemplateFile, TemplateBlock, ModuleBlock } from "@repo/schemas";
 
 /**
  * Collected data from processing template/module blocks
