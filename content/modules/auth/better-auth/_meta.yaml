@@ -4,7 +4,7 @@ description: better-auth setup with session management
 framework: express
 
 dependencies:
-  - better-auth
+  - better-auth@^1.2.12
 
 devDependencies: []
 

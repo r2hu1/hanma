@@ -8,13 +8,13 @@ includes:
     path: src/db/storage.ts
 
 dependencies:
-  - drizzle-orm
-  - pg
-  - dotenv
+  - drizzle-orm@^0.44.2
+  - pg@^8.16.0
+  - dotenv@^16.5.0
 
 devDependencies:
-  - drizzle-kit
-  - "@types/pg"
+  - drizzle-kit@^0.31.1
+  - "@types/pg@^8.11.14"
 
 scripts:
   db:generate: "drizzle-kit generate"

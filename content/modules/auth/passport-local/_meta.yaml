@@ -4,14 +4,14 @@ description: Passport.js with local username/password strategy
 framework: express
 
 dependencies:
-  - passport
-  - passport-local
-  - express-session
+  - passport@^0.7.0
+  - passport-local@^1.0.0
+  - express-session@^1.18.1
 
 devDependencies:
-  - "@types/passport"
-  - "@types/passport-local"
-  - "@types/express-session"
+  - "@types/passport@^1.0.17"
+  - "@types/passport-local@^1.0.38"
+  - "@types/express-session@^1.18.1"
 
 envVars:
   - SESSION_SECRET=your-session-secret-change-in-production

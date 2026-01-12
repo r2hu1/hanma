@@ -10,10 +10,10 @@ includes:
     path: src/utils/jwt.ts
 
 dependencies:
-  - jsonwebtoken
+  - jsonwebtoken@^9.0.2
 
 devDependencies:
-  - "@types/jsonwebtoken"
+  - "@types/jsonwebtoken@^9.0.10"
 
 envVars:
   - JWT_SECRET=your-secret-key-change-in-production
