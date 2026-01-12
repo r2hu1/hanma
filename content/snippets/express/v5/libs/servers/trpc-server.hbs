@@ -1,0 +1,162 @@
+---
+name: trpc-server
+description: tRPC server setup with Express adapter
+dependencies:
+  - "@trpc/server@^11.0.0-rc.666"
+  - "zod@^3.24.1"
+devDependencies:
+  - "@types/node@^22.10.5"
+  - "@types/express@^5.0.0"
+files:
+  - name: libs/servers/trpc-server.ts
+---
+import { initTRPC, TRPCError } from "@trpc/server";
+import { createExpressMiddleware } from "@trpc/server/adapters/express";
+import express from "express";
+import { z } from "zod";
+import type { Server } from "http";
+
+/**
+ * Context creation function
+ */
+const createContext = ({
+  req,
+  res,
+}: {
+  req: express.Request;
+  res: express.Response;
+}) => {
+  return { req, res };
+};
+
+type Context = Awaited<ReturnType<typeof createContext>>;
+
+/**
+ * Initialize tRPC
+ */
+const t = initTRPC.context<Context>().create({
+  errorFormatter({ shape }) {
+    return {
+      ...shape,
+      data: {
+        ...shape.data,
+      },
+    };
+  },
+});
+
+/**
+ * Middleware
+ */
+const isAuthenticated = t.middleware(({ ctx, next }) => {
+  return next({ ctx });
+});
+
+export const router = t.router;
+export const publicProcedure = t.procedure;
+export const protectedProcedure = t.procedure.use(isAuthenticated);
+
+/**
+ * Router
+ */
+const appRouter = router({
+  health: publicProcedure.query(() => ({
+    status: "ok",
+    timestamp: new Date().toISOString(),
+  })),
+
+  hello: publicProcedure
+    .input(z.object({ name: z.string().optional() }))
+    .query(({ input }) => {
+      return { greeting: `Hello ${input.name || "World"}!` };
+    }),
+
+  createItem: publicProcedure
+    .input(
+      z.object({
+        title: z.string().min(1).max(100),
+        description: z.string().optional(),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      return {
+        id: Math.random().toString(36).slice(2),
+        ...input,
+        createdAt: new Date(),
+      };
+    }),
+
+  user: router({
+    list: publicProcedure.query(() => {
+      return [{ id: "1", name: "John" }];
+    }),
+    byId: publicProcedure
+      .input(z.object({ id: z.string() }))
+      .query(({ input }) => {
+        return { id: input.id, name: "John" };
+      }),
+  }),
+});
+
+export type AppRouter = typeof appRouter;
+
+/**
+ * ===== SERVER LIFECYCLE STATE =====
+ */
+let httpServer: Server | null = null;
+let shuttingDown = false;
+
+/**
+ * Create and start server
+ */
+export const startTRPCServer = (port = 4000) => {
+  const app = express();
+
+  app.get("/health", (_req, res) => {
+    res.json({ status: "ok", timestamp: new Date().toISOString() });
+  });
+
+  app.use(
+    "/trpc",
+    createExpressMiddleware({
+      router: appRouter,
+      createContext,
+      onError({ error, path }) {
+        console.error(`[ERROR] tRPC error on ${path}:`, error.message);
+      },
+    }),
+  );
+
+  httpServer = app.listen(port, () => {
+    console.log(`tRPC server running at http://localhost:${port}/trpc`);
+  });
+
+  return { app, server: httpServer, router: appRouter };
+};
+
+/**
+ * Graceful shutdown exported from THIS file
+ */
+export async function shutdownTRPCServer(signal: string) {
+  if (shuttingDown) return;
+  shuttingDown = true;
+
+  console.log(`🧹 tRPC shutting down due to ${signal}`);
+
+  if (!httpServer) {
+    process.exit(0);
+  }
+
+  await new Promise<void>((resolve) => {
+    httpServer!.close((err) => {
+      if (err) {
+        console.error("Error closing server:", err);
+      } else {
+        console.log("🚪 HTTP server closed");
+      }
+      resolve();
+    });
+  });
+
+  process.exit(0);
+}

@@ -1,0 +1,108 @@
+---
+name: rate-limiter
+description: Rate limiting middleware to prevent brute-force and DDoS attacks
+
+dependencies:
+  "express-rate-limit": "^7.5.0"
+
+devDependencies:
+  "@types/express": "^5.0.0"
+
+files:
+  - name: middleware/security/rate-limiter.ts
+---
+
+import rateLimit, { RateLimitRequestHandler } from 'express-rate-limit';
+import { Request, Response } from 'express';
+
+/**
+ * Default rate limiter for general API endpoints
+ * 100 requests per 15 minutes per IP
+ */
+export const defaultLimiter: RateLimitRequestHandler = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100,
+  message: {
+    success: false,
+    message: 'Too many requests, please try again later.',
+  },
+  standardHeaders: true, // Return rate limit info in `RateLimit-*` headers
+  legacyHeaders: false,  // Disable `X-RateLimit-*` headers
+  keyGenerator: (req: Request) => {
+    // Use X-Forwarded-For for proxied requests, fallback to IP
+    return (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() 
+      || req.ip 
+      || 'unknown';
+  },
+});
+
+/**
+ * Strict rate limiter for authentication endpoints
+ * 5 attempts per 15 minutes per IP
+ */
+export const authLimiter: RateLimitRequestHandler = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5,
+  message: {
+    success: false,
+    message: 'Too many login attempts, please try again after 15 minutes.',
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  skipSuccessfulRequests: true, // Don't count successful logins
+  keyGenerator: (req: Request) => {
+    return (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() 
+      || req.ip 
+      || 'unknown';
+  },
+});
+
+/**
+ * API rate limiter for external API consumers
+ * 1000 requests per hour per API key or IP
+ */
+export const apiLimiter: RateLimitRequestHandler = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 1000,
+  message: {
+    success: false,
+    message: 'API rate limit exceeded. Please try again later.',
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req: Request) => {
+    // Use API key if available, otherwise fall back to IP
+    const apiKey = req.headers['x-api-key'];
+    if (typeof apiKey === 'string') return apiKey;
+    
+    return (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() 
+      || req.ip 
+      || 'unknown';
+  },
+});
+
+/**
+ * Create a custom rate limiter with specific options
+ */
+export const createLimiter = (options: {
+  windowMs: number;
+  max: number;
+  message?: string;
+  keyGenerator?: (req: Request) => string;
+}): RateLimitRequestHandler => {
+  return rateLimit({
+    windowMs: options.windowMs,
+    max: options.max,
+    message: {
+      success: false,
+      message: options.message || 'Too many requests.',
+    },
+    standardHeaders: true,
+    legacyHeaders: false,
+    keyGenerator: options.keyGenerator || ((req: Request) => {
+      return (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() 
+        || req.ip 
+        || 'unknown';
+    }),
+  });
+};

@@ -1,0 +1,33 @@
+---
+name: error-middleware
+description: Error handling and 404 middleware for Express
+dependencies: []
+devDependencies: []
+files:
+  - name: middleware/error.ts
+---
+import { Request, Response, NextFunction } from "express";
+
+export const errorHandler = (
+  err: Error,
+  _req: Request,
+  res: Response,
+  _next: NextFunction
+) => {
+  console.error("[ERROR]", err.stack || err.message);
+  res.status(500).json({
+    success: false,
+    message:
+      process.env.NODE_ENV === "development"
+        ? err.message
+        : "Internal Server Error",
+  });
+};
+
+export const notFoundHandler = (req: Request, res: Response) => {
+  res.status(404).json({
+    success: false,
+    message: "Resource not found",
+    path: req.originalUrl,
+  });
+};

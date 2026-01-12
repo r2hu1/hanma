@@ -1,0 +1,128 @@
+---
+name: graphql-server
+description: Apollo GraphQL server setup with Express integration
+dependencies:
+  - "@apollo/server@^4.11.2"
+  - "graphql@^16.10.0"
+  - "express@^5.0.1"
+  - "cors@^2.8.5"
+devDependencies:
+  - "@types/node@^22.10.5"
+  - "@types/express@^5.0.0"
+  - "@types/cors@^2.8.17"
+files:
+  - name: libs/servers/graphql-server.ts
+---
+import { ApolloServer } from "@apollo/server";
+import { ApolloServerPluginDrainHttpServer } from "@apollo/server/plugin/drainHttpServer";
+import express from "express";
+import http from "http";
+import cors from "cors";
+
+import type { RequestHandler } from "express";
+import { expressMiddleware } from "@apollo/server/express4";
+
+/**
+ * Apollo ships Express-5 typed middleware
+ * but runs on Express-4.
+ * This adapter fixes the type universe.
+ */
+export function apolloExpress4(...args: Parameters<typeof expressMiddleware>) {
+  return expressMiddleware(...args) as unknown as RequestHandler;
+}
+
+
+let app: express.Express | null = null;
+let httpServer: http.Server | null = null;
+let apolloServer: ApolloServer | null = null;
+
+/* ---------------- Schema ---------------- */
+
+const typeDefs = `#graphql
+  type Query {
+    hello: String
+    health: HealthStatus
+  }
+
+  type HealthStatus {
+    status: String!
+    timestamp: String!
+  }
+`;
+
+const resolvers = {
+  Query: {
+    hello: () => "Hello from GraphQL!",
+    health: () => ({
+      status: "ok",
+      timestamp: new Date().toISOString(),
+    }),
+  },
+};
+
+export interface GraphQLContext {}
+
+/* ---------------- Start ---------------- */
+
+export async function startGraphQLServer(port = 4000) {
+  if (httpServer) {
+    console.warn("GraphQL already running");
+    return;
+  }
+
+  app = express();
+  httpServer = http.createServer(app);
+
+  apolloServer = new ApolloServer<GraphQLContext>({
+    typeDefs,
+    resolvers,
+    introspection: process.env.NODE_ENV !== "production",
+    plugins: [ApolloServerPluginDrainHttpServer({ httpServer })],
+  });
+
+  await apolloServer.start();
+
+  app.use(
+    "/graphql",
+    cors<cors.CorsRequest>(),
+    express.json(),
+    apolloExpress4(apolloServer, {
+      context: async () => ({}),
+    }),
+  );
+
+  app.get("/health", (_req, res) => {
+    res.json({ status: "ok", timestamp: new Date().toISOString() });
+  });
+
+  await new Promise<void>((resolve) => httpServer!.listen({ port }, resolve));
+
+  console.log(`GraphQL running at http://localhost:${port}/graphql`);
+}
+
+/* ---------------- Shutdown ---------------- */
+
+export async function shutdownGraphQLServer(signal: string) {
+  console.log(`Shutdown signal received: ${signal}`);
+
+  try {
+    if (apolloServer) {
+      await apolloServer.stop();
+      apolloServer = null;
+    }
+
+    if (httpServer) {
+      await new Promise<void>((resolve, reject) => {
+        httpServer!.close((err) => (err ? reject(err) : resolve()));
+      });
+      httpServer = null;
+    }
+
+    app = null;
+    console.log("GraphQL shutdown complete");
+    process.exit(0);
+  } catch (err) {
+    console.error("Shutdown failed", err);
+    process.exit(1);
+  }
+}

@@ -1,0 +1,51 @@
+---
+name: hono-security
+description: Security headers middleware for Hono similar to Helmet
+dependencies:
+  - hono@^4.6.14
+files:
+  - name: src/middleware/security.ts
+---
+import { secureHeaders } from "hono/secure-headers";
+import { Hono } from "hono";
+
+/**
+ * Production security headers configuration
+ */
+export const productionSecurity = secureHeaders({
+  contentSecurityPolicy: {
+    defaultSrc: ["'self'"],
+    scriptSrc: ["'self'", "https://trusted.cdn.com"],
+    styleSrc: ["'self'", "'unsafe-inline'"],
+    imgSrc: ["'self'", "data:", "https:"],
+    connectSrc: ["'self'", "https://api.trusted.com"],
+    fontSrc: ["'self'"],
+    objectSrc: ["'none'"],
+    mediaSrc: ["'self'"],
+    frameSrc: ["'none'"],
+    baseUri: ["'self'"],
+    formAction: ["'self'"],
+    frameAncestors: ["'none'"],
+    upgradeInsecureRequests: [],
+  },
+  strictTransportSecurity: "max-age=31536000; includeSubDomains; preload",
+  xFrameOptions: "DENY",
+  xContentTypeOptions: "nosniff",
+  referrerPolicy: "strict-origin-when-cross-origin",
+  xXssProtection: "1; mode=block",
+});
+
+/**
+ * Development security headers (relaxed)
+ */
+export const developmentSecurity = secureHeaders({
+  contentSecurityPolicy: false,
+});
+
+/**
+ * Setup security headers based on environment
+ */
+export const setupSecurity = (app: Hono) => {
+  const isProd = process.env.NODE_ENV === "production";
+  app.use("*", isProd ? productionSecurity : developmentSecurity);
+};

@@ -1,0 +1,108 @@
+---
+name: hono-cors
+description: Production-ready CORS middleware with environment-driven configuration
+dependencies:
+  - hono@^4.6.14
+files:
+  - name: src/middleware/cors.ts
+---
+import { cors } from "hono/cors";
+import type { CorsOptions } from "hono/cors";
+
+/**
+ * Parses environment variables to get allowed origins, methods, and headers.
+ * Set these in your .env file:
+ * - CORS_ORIGINS=https://example.com,https://app.example.com
+ * - CORS_METHODS=GET,POST,PUT,DELETE,OPTIONS
+ * - CORS_HEADERS=Content-Type,Authorization
+ */
+const getEnvConfig = () => {
+  const allowedOrigins = (process.env.CORS_ORIGINS ?? "")
+    .split(",")
+    .map((o) => o.trim())
+    .filter((o) => o.length > 0);
+
+  const allowedMethods = (process.env.CORS_METHODS ?? "GET,POST,PUT,DELETE,OPTIONS")
+    .split(",")
+    .map((m) => m.trim())
+    .filter((m) => m.length > 0);
+
+  const allowedHeaders = (process.env.CORS_HEADERS ?? "Content-Type,Authorization")
+    .split(",")
+    .map((h) => h.trim())
+    .filter((h) => h.length > 0);
+
+  return { allowedOrigins, allowedMethods, allowedHeaders };
+};
+
+export const { allowedOrigins, allowedMethods, allowedHeaders } = getEnvConfig();
+
+/**
+ * Creates CORS options based on environment or provided overrides.
+ */
+export const createCorsOptions = (
+  overrides?: Partial<CorsOptions> & {
+    origins?: string[];
+    methods?: string[];
+    headers?: string[];
+  }
+): CorsOptions => {
+  const origins = overrides?.origins ?? allowedOrigins;
+  const methods = overrides?.methods ?? allowedMethods;
+  const headers = overrides?.headers ?? allowedHeaders;
+
+  return {
+    origin: (origin) => {
+      // Allow requests with no origin (mobile apps, curl, same-origin)
+      if (!origin) return origin;
+
+      // If no origins configured, allow all (development mode)
+      if (origins.length === 0) return origin;
+
+      // Check if origin is in allowed list
+      return origins.includes(origin) ? origin : origins[0];
+    },
+    allowMethods: methods,
+    allowHeaders: headers,
+    exposeHeaders: ["Content-Length", "X-Request-Id"],
+    maxAge: 600,
+    credentials: true,
+    ...overrides,
+  };
+};
+
+/**
+ * Validate CORS configuration on startup
+ */
+export const validateCorsConfig = (): boolean => {
+  if (allowedOrigins.length === 0) {
+    console.warn(
+      "[CORS] No CORS_ORIGINS configured. All origins will be allowed (development mode)."
+    );
+    return false;
+  }
+  console.log(`[CORS] Allowed origins: ${allowedOrigins.join(", ")}`);
+  return true;
+};
+
+/**
+ * Pre-configured CORS middleware using environment variables
+ */
+export const corsMiddleware = cors(createCorsOptions());
+
+/**
+ * Development CORS (allows all origins)
+ */
+export const devCorsMiddleware = cors({
+  origin: "*",
+  allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowHeaders: ["Content-Type", "Authorization"],
+  credentials: true,
+});
+
+/**
+ * Get appropriate CORS middleware based on environment
+ */
+export const getCorsMiddleware = () => {
+  return process.env.NODE_ENV === "production" ? corsMiddleware : devCorsMiddleware;
+};

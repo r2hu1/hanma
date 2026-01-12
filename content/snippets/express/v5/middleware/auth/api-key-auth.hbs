@@ -1,0 +1,143 @@
+---
+name: api-key-auth
+description: API Key authentication middleware for service-to-service communication
+dependencies: []
+devDependencies:
+  - "@types/express@^5.0.0"
+files:
+  - name: middleware/auth/api-key-auth.ts
+---
+import { Request, Response, NextFunction } from 'express';
+import { timingSafeEqual } from 'crypto';
+
+/**
+ * API Key configuration
+ * In production, load these from environment variables or a database
+ */
+const API_KEYS: Record<string, ApiKeyConfig> = {
+  // Example: 'your-api-key-here': { name: 'Service A', permissions: ['read', 'write'] }
+};
+
+// Load from environment if available
+const ENV_API_KEY = process.env.API_KEY;
+if (ENV_API_KEY) {
+  API_KEYS[ENV_API_KEY] = { name: 'default', permissions: ['read', 'write'] };
+}
+
+interface ApiKeyConfig {
+  name: string;
+  permissions: string[];
+  rateLimit?: number;
+}
+
+export interface ApiKeyRequest extends Request {
+  apiKey?: ApiKeyConfig;
+}
+
+/**
+ * Constant-time string comparison to prevent timing attacks
+ */
+const safeCompare = (a: string, b: string): boolean => {
+  if (a.length !== b.length) return false;
+  
+  try {
+    return timingSafeEqual(Buffer.from(a), Buffer.from(b));
+  } catch {
+    return false;
+  }
+};
+
+/**
+ * Extract API key from request
+ * Supports: X-API-Key header, Authorization header, or query parameter
+ */
+const extractApiKey = (req: Request): string | null => {
+  // Check X-API-Key header (preferred)
+  const headerKey = req.headers['x-api-key'];
+  if (typeof headerKey === 'string') return headerKey;
+  
+  // Check Authorization header with "ApiKey" scheme
+  const authHeader = req.headers.authorization;
+  if (authHeader?.startsWith('ApiKey ')) {
+    return authHeader.slice(7);
+  }
+  
+  // Check query parameter (not recommended for production)
+  const queryKey = req.query.api_key;
+  if (typeof queryKey === 'string') return queryKey;
+  
+  return null;
+};
+
+/**
+ * Validate API key against known keys
+ */
+const validateApiKey = (key: string): ApiKeyConfig | null => {
+  for (const [validKey, config] of Object.entries(API_KEYS)) {
+    if (safeCompare(key, validKey)) {
+      return config;
+    }
+  }
+  return null;
+};
+
+/**
+ * API Key Authentication Middleware
+ * Validates API key and attaches config to req.apiKey
+ */
+export const apiKeyAuth = (
+  req: ApiKeyRequest,
+  res: Response,
+  next: NextFunction
+) => {
+  const key = extractApiKey(req);
+
+  if (!key) {
+    return res.status(401).json({
+      success: false,
+      message: 'API key required. Provide via X-API-Key header.',
+    });
+  }
+
+  const config = validateApiKey(key);
+
+  if (!config) {
+    return res.status(401).json({
+      success: false,
+      message: 'Invalid API key.',
+    });
+  }
+
+  req.apiKey = config;
+  next();
+};
+
+/**
+ * Permission check middleware
+ * Use after apiKeyAuth middleware
+ * @param requiredPermissions - Permissions needed to access the route
+ */
+export const requirePermissions = (...requiredPermissions: string[]) => {
+  return (req: ApiKeyRequest, res: Response, next: NextFunction) => {
+    if (!req.apiKey) {
+      return res.status(401).json({
+        success: false,
+        message: 'API key authentication required.',
+      });
+    }
+
+    const hasAllPermissions = requiredPermissions.every(
+      (perm) => req.apiKey!.permissions.includes(perm)
+    );
+
+    if (!hasAllPermissions) {
+      return res.status(403).json({
+        success: false,
+        message: 'Insufficient permissions.',
+        required: requiredPermissions,
+      });
+    }
+
+    next();
+  };
+};

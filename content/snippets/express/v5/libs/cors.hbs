@@ -1,0 +1,94 @@
+---
+name: cors
+description: Basic CORS setup for Express
+dependencies:
+  - "cors@^2.8.5"
+devDependencies:
+  - "@types/cors@^2.8.17"
+files:
+  - name: cors.ts
+---
+import cors, { CorsOptions } from "cors";
+
+/**
+ * Parses environment variables to get allowed origins, methods, and headers.
+ */
+const getEnvConfig = () => {
+  const allowedOrigins: string[] = (process.env.CORS_ORIGINS ?? "")
+    .split(",")
+    .map((o: string) => o.trim())
+    .filter((o: string) => o.length > 0);
+
+  const allowedMethods: string[] = (process.env.CORS_METHODS ?? "")
+    .split(",")
+    .map((m: string) => m.trim())
+    .filter((m: string) => m.length > 0);
+
+  const allowedHeaders: string[] = (process.env.CORS_HEADERS ?? "")
+    .split(",")
+    .map((h: string) => h.trim())
+    .filter((h: string) => h.length > 0);
+
+  return { allowedOrigins, allowedMethods, allowedHeaders };
+};
+
+export const { allowedOrigins, allowedMethods, allowedHeaders } =
+  getEnvConfig();
+
+/**
+ * Creates valid CorsOptions based on provided or environment configuration.
+ */
+export const createCorsOptions = (
+  overrides?: Partial<CorsOptions> & {
+    origins?: string[];
+    methods?: string[];
+    headers?: string[];
+  }
+): CorsOptions => {
+  const origins = overrides?.origins ?? allowedOrigins;
+  const methods = overrides?.methods ?? allowedMethods;
+  const headers = overrides?.headers ?? allowedHeaders;
+
+  return {
+    origin: (
+      origin: string | undefined,
+      callback: (error: Error | null, allow?: boolean) => void
+    ) => {
+      // Allow requests with no origin (mobile apps, curl, same-origin)
+      if (!origin) return callback(null, true);
+
+      if (origins.length === 0 || origins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
+    methods,
+    allowedHeaders: headers,
+    credentials: true,
+    ...overrides,
+  };
+};
+
+/**
+ * Check if critical CORS configuration is missing.
+ * Useful for validating environment setup on startup.
+ */
+export const validateCorsConfig = () => {
+  if (
+    !allowedOrigins.length ||
+    !allowedMethods.length ||
+    !allowedHeaders.length
+  ) {
+    console.warn(
+      " CORS configuration might be incomplete. Check CORS_ORIGINS, CORS_METHODS, and CORS_HEADERS .env variables."
+    );
+    return false;
+  }
+  return true;
+};
+
+// Default export uses strict environment variables but doesn't hard exit only warns if missing,
+// unless strict validation is called.
+const defaultOptions = createCorsOptions();
+export const corsMiddleware = cors(defaultOptions);

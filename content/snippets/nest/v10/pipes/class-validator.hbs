@@ -1,0 +1,147 @@
+---
+name: class-validator-pipe
+description: Validation pipe using class-validator with detailed error parsing and formatting
+dependencies:
+  - "class-validator@^0.14.1"
+  - "class-transformer@^0.5.1"
+devDependencies: []
+files:
+  - name: pipes/validation.pipe.ts
+---
+import {
+  PipeTransform,
+  Injectable,
+  ArgumentMetadata,
+  BadRequestException,
+  ValidationError,
+} from "@nestjs/common";
+import { validate } from "class-validator";
+import { plainToInstance } from "class-transformer";
+
+export interface ValidationErrorResponse {
+  statusCode: 400;
+  error: "Bad Request";
+  message: string;
+  errors: FieldError[];
+}
+
+export interface FieldError {
+  field: string;
+  message: string;
+  constraints: string[];
+}
+
+@Injectable()
+export class ClassValidatorPipe implements PipeTransform<any> {
+  async transform(value: any, { metatype }: ArgumentMetadata) {
+    if (!metatype || !this.toValidate(metatype)) {
+      return value;
+    }
+
+    const object = plainToInstance(metatype, value, {
+      enableImplicitConversion: true,
+      excludeExtraneousValues: false,
+    });
+
+    const errors = await validate(object, {
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      forbidUnknownValues: true,
+    });
+
+    if (errors.length > 0) {
+      throw new BadRequestException({
+        statusCode: 400,
+        error: "Bad Request",
+        message: "Validation failed",
+        errors: this.formatErrors(errors),
+      });
+    }
+
+    return object;
+  }
+
+  private toValidate(metatype: any): boolean {
+    const types = [String, Boolean, Number, Array, Object];
+    return !types.includes(metatype);
+  }
+
+  private formatErrors(errors: ValidationError[]): FieldError[] {
+    return errors.flatMap((error) => this.extractErrors(error));
+  }
+
+  private extractErrors(error: ValidationError, parentPath = ""): FieldError[] {
+    const field = parentPath
+      ? `${parentPath}.${error.property}`
+      : error.property;
+
+    const results: FieldError[] = [];
+
+    // Handle constraints on current property
+    if (error.constraints) {
+      results.push({
+        field,
+        message: Object.values(error.constraints)[0],
+        constraints: Object.values(error.constraints),
+      });
+    }
+
+    // Handle nested validation errors
+    if (error.children && error.children.length > 0) {
+      for (const child of error.children) {
+        results.push(...this.extractErrors(child, field));
+      }
+    }
+
+    return results;
+  }
+}
+
+// Global setup in main.ts:
+/*
+import { ClassValidatorPipe } from "./pipes/validation.pipe";
+
+app.useGlobalPipes(new ClassValidatorPipe());
+*/
+
+// Example DTO with class-validator decorators:
+/*
+import {
+  IsString,
+  IsEmail,
+  IsNotEmpty,
+  MinLength,
+  IsOptional,
+  ValidateNested,
+  IsArray,
+} from "class-validator";
+import { Type } from "class-transformer";
+
+export class AddressDto {
+  @IsString()
+  @IsNotEmpty()
+  street: string;
+
+  @IsString()
+  @IsNotEmpty()
+  city: string;
+}
+
+export class CreateUserDto {
+  @IsEmail()
+  email: string;
+
+  @IsString()
+  @MinLength(8)
+  password: string;
+
+  @IsString()
+  @IsOptional()
+  name?: string;
+
+  @ValidateNested()
+  @Type(() => AddressDto)
+  @IsOptional()
+  address?: AddressDto;
+}
+*/

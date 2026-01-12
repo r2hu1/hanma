@@ -1,0 +1,177 @@
+---
+name: slug
+description: URL-safe slug generation with uniqueness helpers
+dependencies:
+  - "slugify@^1.6.6"
+devDependencies:
+  - "@types/node@^22.10.5"
+files:
+  - name: utils/slug.ts
+---
+import slugify from "slugify";
+import { randomBytes } from "crypto";
+
+export interface SlugOptions {
+  lowercase?: boolean;
+  strict?: boolean;
+  locale?: string;
+  trim?: boolean;
+  replacement?: string;
+}
+
+const DEFAULT_OPTIONS: SlugOptions = {
+  lowercase: true,
+  strict: true,
+  locale: "en",
+  trim: true,
+  replacement: "-",
+};
+
+/**
+ * Generate a URL-safe slug from a string.
+ */
+export function generateSlug(text: string, options?: SlugOptions): string {
+  const opts = { ...DEFAULT_OPTIONS, ...options };
+  return slugify(text, opts);
+}
+
+/**
+ * Generate a unique slug with random suffix.
+ */
+export function generateUniqueSlug(text: string, length = 6): string {
+  const slug = generateSlug(text);
+  const suffix = randomBytes(Math.ceil(length / 2))
+    .toString("hex")
+    .slice(0, length);
+  return `${slug}-${suffix}`;
+}
+
+/**
+ * Generate a slug with timestamp for time-based uniqueness.
+ */
+export function generateTimestampSlug(text: string): string {
+  const slug = generateSlug(text);
+  const timestamp = Date.now().toString(36);
+  return `${slug}-${timestamp}`;
+}
+
+/**
+ * Validate if a string is a valid slug.
+ */
+export function isValidSlug(slug: string): boolean {
+  return /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug);
+}
+
+/**
+ * Sanitize a string to be used as a slug (more lenient than generateSlug).
+ */
+export function sanitizeSlug(slug: string): string {
+  return slug
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9-]/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
+}
+
+/**
+ * Create a slug checker factory for database collision avoidance.
+ * 
+ * Usage:
+ * const checkSlug = createSlugChecker(async (slug) => {
+ *   const existing = await prisma.post.findUnique({ where: { slug } });
+ *   return existing === null;
+ * });
+ * 
+ * const uniqueSlug = await checkSlug("my-post-title");
+ */
+export function createSlugChecker(
+  isAvailable: (slug: string) => Promise<boolean>,
+  maxAttempts = 10
+) {
+  return async function ensureUniqueSlug(
+    text: string,
+    existingSlug?: string
+  ): Promise<string> {
+    const baseSlug = generateSlug(text);
+
+    // If updating and slug hasn't changed, return the existing one
+    if (existingSlug && sanitizeSlug(existingSlug) === baseSlug) {
+      return existingSlug;
+    }
+
+    // Check if base slug is available
+    if (await isAvailable(baseSlug)) {
+      return baseSlug;
+    }
+
+    // Try with numeric suffixes
+    for (let i = 2; i <= maxAttempts; i++) {
+      const slug = `${baseSlug}-${i}`;
+      if (await isAvailable(slug)) {
+        return slug;
+      }
+    }
+
+    // Fallback to random suffix
+    return generateUniqueSlug(text);
+  };
+}
+
+/**
+ * Extract slug from URL path.
+ */
+export function extractSlugFromUrl(url: string): string | null {
+  const match = url.match(/\/([a-z0-9-]+)\/?(?:\?|#|$)/i);
+  return match ? match[1] : null;
+}
+
+/**
+ * Generate slug with category prefix.
+ */
+export function generateCategorizedSlug(
+  category: string,
+  text: string
+): string {
+  const categorySlug = generateSlug(category);
+  const textSlug = generateSlug(text);
+  return `${categorySlug}/${textSlug}`;
+}
+
+// Usage:
+/*
+import { generateSlug, createSlugChecker } from "./utils/slug";
+
+@Injectable()
+export class PostService {
+  private checkSlugAvailability = createSlugChecker(async (slug) => {
+    const post = await this.prisma.post.findUnique({ where: { slug } });
+    return post === null;
+  });
+
+  async create(dto: CreatePostDto) {
+    const slug = await this.checkSlugAvailability(dto.title);
+    
+    return this.prisma.post.create({
+      data: {
+        title: dto.title,
+        slug,
+        content: dto.content,
+      },
+    });
+  }
+
+  async update(id: string, dto: UpdatePostDto) {
+    const post = await this.prisma.post.findUnique({ where: { id } });
+    
+    const slug = dto.title
+      ? await this.checkSlugAvailability(dto.title, post.slug)
+      : post.slug;
+
+    return this.prisma.post.update({
+      where: { id },
+      data: { ...dto, slug },
+    });
+  }
+}
+*/

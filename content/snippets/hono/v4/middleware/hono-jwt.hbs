@@ -1,0 +1,45 @@
+---
+name: hono-jwt
+description: JWT authentication with RBAC and detailed error handling for Hono
+dependencies:
+  - hono@^4.6.14
+files:
+  - name: src/middleware/auth.ts
+---
+import { jwt } from "hono/jwt";
+import { createMiddleware } from "hono/factory";
+import type { Context, Next } from "hono";
+
+const JWT_SECRET = process.env.JWT_SECRET || "it-is-so-secret";
+
+/**
+ * Standard JWT Middleware
+ */
+export const jwtMiddleware = jwt({
+  secret: JWT_SECRET,
+});
+
+/**
+ * Role-Based Access Control (RBAC) Middleware
+ */
+export const checkRole = (roles: string[]) => {
+  return createMiddleware(async (c: Context, next: Next) => {
+    const payload = c.get("jwtPayload");
+    
+    if (!payload || !payload.role || !roles.includes(payload.role)) {
+      return c.json({
+        success: false,
+        message: "Forbidden: Insufficient permissions",
+      }, 403);
+    }
+    
+    await next();
+  });
+};
+
+/**
+ * Usage in app:
+ * 
+ * app.use("/api/protected/*", jwtMiddleware);
+ * app.get("/api/admin", checkRole(["admin"]), (c) => c.text("Admin only"));
+ */

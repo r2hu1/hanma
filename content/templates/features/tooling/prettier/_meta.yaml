@@ -1,0 +1,14 @@
+name: tooling-prettier
+category: feature
+featureType: tooling
+description: Prettier for formatting
+
+includes:
+  - snippet: tooling/prettier/config.hbs
+    path: .prettierrc
+
+devDependencies:
+  - prettier@^3.5.3
+
+scripts:
+  format: "prettier --write ."

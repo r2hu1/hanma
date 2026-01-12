@@ -1,0 +1,34 @@
+name: express-graphql
+category: base
+description: Apollo GraphQL server with Express integration
+framework: express
+version: "5"
+
+includes:
+  - snippet: express/v5/libs/servers/graphql-server.hbs
+    path: src/libs/graphql-server.ts
+  - snippet: tooling/tsconfig/express/express.hbs
+    path: tsconfig.json
+
+dependencies:
+  - express@^5.1.0
+  - "@apollo/server@^4.12.2"
+  - graphql@^16.11.0
+  - cors@^2.8.5
+  - dotenv@^16.5.0
+
+devDependencies:
+  - typescript@^5.8.3
+  - "@types/node@^22.15.21"
+  - "@types/express@^5.0.3"
+  - "@types/cors@^2.8.18"
+  - tsx@^4.21.0
+
+scripts:
+  dev: "tsx watch src/index.ts"
+  build: "tsc"
+  start: "node dist/index.js"
+
+envVars:
+  - PORT=4000
+  - NODE_ENV=development

@@ -1,0 +1,80 @@
+---
+name: hono-swagger
+description: Swagger/OpenAPI documentation for Hono using @hono/swagger-ui
+dependencies:
+  - hono@^4.6.14
+  - "@hono/swagger-ui@^0.5.0"
+files:
+  - name: src/docs/swagger.ts
+---
+import { swaggerUI } from "@hono/swagger-ui";
+import { Hono } from "hono";
+
+/**
+ * OpenAPI specification for your API
+ */
+export const openApiSpec = {
+  openapi: "3.0.0",
+  info: {
+    title: "Hono API",
+    version: "1.0.0",
+    description: "API documentation for your Hono application",
+  },
+  servers: [
+    {
+      url: process.env.API_URL || "http://localhost:3000",
+      description: "API Server",
+    },
+  ],
+  paths: {
+    "/health": {
+      get: {
+        summary: "Health check",
+        responses: {
+          "200": {
+            description: "OK",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    status: { type: "string" },
+                    timestamp: { type: "string" },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+    // Add more paths here
+  },
+  components: {
+    securitySchemes: {
+      bearerAuth: {
+        type: "http",
+        scheme: "bearer",
+        bearerFormat: "JWT",
+      },
+    },
+  },
+};
+
+/**
+ * Setup Swagger UI routes
+ */
+export const setupSwagger = (app: Hono) => {
+  // Serve OpenAPI spec as JSON
+  app.get("/api-docs/json", (c) => c.json(openApiSpec));
+
+  // Serve Swagger UI
+  app.get(
+    "/api-docs",
+    swaggerUI({
+      url: "/api-docs/json",
+    })
+  );
+
+  console.log("[Swagger] Documentation available at /api-docs");
+};

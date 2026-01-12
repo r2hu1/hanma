@@ -1,0 +1,115 @@
+---
+name: hono-rate-limiter
+description: Rate limiting middleware for Hono with default, auth, and API presets
+dependencies:
+  - hono@^4.6.14
+files:
+  - name: src/middleware/rate-limiter.ts
+---
+import { createMiddleware } from "hono/factory";
+import type { Context, Next } from "hono";
+
+interface RateLimitStore {
+  [key: string]: { count: number; resetTime: number };
+}
+
+const store: RateLimitStore = {};
+
+interface RateLimitOptions {
+  windowMs: number;
+  max: number;
+  message?: string;
+  keyGenerator?: (c: Context) => string;
+  skipSuccessfulRequests?: boolean;
+}
+
+/**
+ * Creates a rate limiter middleware
+ */
+export const createRateLimiter = (options: RateLimitOptions) => {
+  const {
+    windowMs,
+    max,
+    message = "Too many requests, please try again later.",
+    keyGenerator = (c) =>
+      c.req.header("x-forwarded-for")?.split(",")[0]?.trim() ||
+      c.req.header("x-real-ip") ||
+      "unknown",
+    skipSuccessfulRequests = false,
+  } = options;
+
+  return createMiddleware(async (c: Context, next: Next) => {
+    const key = keyGenerator(c);
+    const now = Date.now();
+
+    // Initialize or reset if window expired
+    if (!store[key] || now > store[key].resetTime) {
+      store[key] = { count: 0, resetTime: now + windowMs };
+    }
+
+    // Check if limit exceeded
+    if (store[key].count >= max) {
+      c.header("X-RateLimit-Limit", String(max));
+      c.header("X-RateLimit-Remaining", "0");
+      c.header("X-RateLimit-Reset", String(Math.ceil(store[key].resetTime / 1000)));
+      c.header("Retry-After", String(Math.ceil((store[key].resetTime - now) / 1000)));
+
+      return c.json({ success: false, message }, 429);
+    }
+
+    // Increment counter before request
+    store[key].count++;
+
+    // Set rate limit headers
+    c.header("X-RateLimit-Limit", String(max));
+    c.header("X-RateLimit-Remaining", String(max - store[key].count));
+    c.header("X-RateLimit-Reset", String(Math.ceil(store[key].resetTime / 1000)));
+
+    await next();
+
+    // Decrement counter for successful requests if configured
+    if (skipSuccessfulRequests && c.res.status < 400) {
+      store[key].count = Math.max(0, store[key].count - 1);
+    }
+  });
+};
+
+/**
+ * Default rate limiter: 100 requests per 15 minutes
+ */
+export const defaultLimiter = createRateLimiter({
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+});
+
+/**
+ * Auth rate limiter: 5 attempts per 15 minutes (for login/signup)
+ */
+export const authLimiter = createRateLimiter({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  message: "Too many login attempts, please try again after 15 minutes.",
+  skipSuccessfulRequests: true,
+});
+
+/**
+ * API rate limiter: 1000 requests per hour (for API consumers)
+ */
+export const apiLimiter = createRateLimiter({
+  windowMs: 60 * 60 * 1000,
+  max: 1000,
+  message: "API rate limit exceeded. Please try again later.",
+  keyGenerator: (c) =>
+    c.req.header("x-api-key") ||
+    c.req.header("x-forwarded-for")?.split(",")[0]?.trim() ||
+    "unknown",
+});
+
+/**
+ * Strict limiter: 10 requests per minute (for sensitive endpoints)
+ */
+export const strictLimiter = createRateLimiter({
+  windowMs: 60 * 1000,
+  max: 10,
+  message: "Rate limit exceeded for this endpoint.",
+});
